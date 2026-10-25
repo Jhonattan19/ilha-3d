@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0b1220">
+  <title>Ilha Livre 3D</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Celular em pé: pede para deitar -->
+  <div id="avisoGirar" class="aviso-girar"><div>📱↻</div><p>Gire o celular para jogar deitado</p></div>
+
+  <!-- O Three.js desenha o mundo 3D dentro deste canvas -->
+  <canvas id="tela"></canvas>
+
+  <!-- HUD: informações por cima do jogo -->
+  <div id="hud" class="escondido">
+    <div class="painel missao">
+      <div class="linha"><span class="rotulo">VIDA</span><div class="barra-status"><div id="barraVida" class="vida"></div></div></div>
+      <div class="linha"><span class="rotulo">FOME</span><div class="barra-status"><div id="barraFome" class="fome"></div></div></div>
+      <div id="linhaFolego" class="linha escondido"><span class="rotulo">FÔLEGO</span><div class="barra-status"><div id="barraFolego" class="folego"></div></div></div>
+      <!-- Só no modo Nova Vida -->
+      <div class="so-vida">
+        <div class="linha"><span class="rotulo">DINHEIRO</span><span id="hudDinheiro" class="dinheiro">R$ 0</span></div>
+        <div class="linha"><span class="rotulo">TRABALHO</span><span id="hudEmprego">Desempregado</span></div>
+        <div class="linha"><span class="rotulo">DIA</span><span id="hudDia">1</span></div>
+        <div id="hudTarefa" class="dica tarefa"></div>
+      </div>
+      <div class="linha so-livre"><span class="rotulo">MOEDAS</span><span id="hudMoedas">0/40</span></div>
+      <div class="linha so-livre"><span class="rotulo">MAIOR SALTO</span><span id="hudSalto">0.0 s</span></div>
+      <div id="hudCorrida" class="corrida escondido">
+        <div class="linha"><span class="rotulo">CORRIDA</span><span id="hudTempo">0:00.000</span></div>
+        <div class="linha"><span class="rotulo">ANEL</span><span id="hudAnel">1/16</span></div>
+      </div>
+      <div class="linha so-livre"><span class="rotulo">RECORDE</span><span id="hudRecorde">--</span></div>
+      <div id="hudDica" class="dica so-livre">Passe pelo portal de LARGADA para começar a Corrida da Ilha</div>
+    </div>
+
+    <div class="painel mapa">
+      <canvas id="minimapa" width="180" height="180"></canvas>
+      <div id="hudHora" class="hora">08:30 ☀️</div>
+    </div>
+
+    <div id="hudMissao" class="painel missao-atual escondido"></div>
+    <div id="bussola" class="bussola escondido"><div id="setaBussola" class="seta">▲</div><div id="distanciaBussola" class="distancia"></div></div>
+
+    <div class="painel velocimetro">
+      <div><span id="hudVelocidade">0</span> <small>km/h</small></div>
+      <div class="barra"><div id="barraNitro" class="preenchido"></div></div>
+      <small id="rotuloNitro" class="rotulo">NITRO (Shift)</small>
+    </div>
+
+    <div id="painelControles" class="painel controles">
+      <b>E</b> sair/entrar no carro, pegar e usar objetos · <b>1–6</b> escolher item · <b>F</b> usar item (mão vazia = soco) ·
+      <b>WASD</b> mover · <b>Espaço</b> freio de mão / pular · <b>Shift</b> nitro / correr · na água: <b>Shift</b> mergulha, <b>Espaço</b> sobe · <b>C</b> câmera ·
+      <b>R</b> voltar à estrada · <b>J</b> pausar o trabalho · <b>T</b> ou <b>/</b> comandos (/tempo, /clima) · <b>H</b> esconder ajuda · <b>P</b> pausa · <b>M</b> som
+    </div>
+
+    <div id="hudComodo" class="comodo escondido"></div>
+    <div id="nomeItem" class="nome-item"></div>
+    <div id="inventario" class="inventario"></div>
+    <div id="flashDano" class="flash-dano"></div>
+    <div id="hudAcao" class="acao escondido"></div>
+    <div id="anuncio" class="anuncio"></div>
+    <div id="telaSono" class="tela-sono"></div>
+
+    <!-- Console de comandos (T ou /) -->
+    <div id="consoleLog" class="console-log"></div>
+    <div id="console" class="console escondido">
+      <input id="consoleEntrada" type="text" autocomplete="off" spellcheck="false" maxlength="80">
+      <div class="console-dica">/tempo manhã · tarde · noite · 14:30 · parar &nbsp;|&nbsp; /clima sol · chuva · neve &nbsp;|&nbsp; /dar item &nbsp;|&nbsp; /graficos bonito · leve &nbsp;|&nbsp; /ajuda &nbsp;·&nbsp; Enter executa · Esc fecha</div>
+    </div>
+  </div>
+
+  <!-- Menu -->
+  <div id="telaInicio" class="tela">
+    <h1 class="titulo">ILHA LIVRE <span>3D</span></h1>
+    <p id="textoCarregando">Gerando a ilha...</p>
+    <div id="menuBotoes" class="escondido">
+      <p class="descricao"><b>Nova vida:</b> chegue na ilha sem dinheiro, só com os documentos.
+        Arrume um emprego (entregador, taxista, pescador ou lenhador), junte dinheiro e
+        conquiste sua moto, seu carro e a sua casa de praia.<br>
+        <b>Modo livre:</b> carro esportivo, moedas, rampas e a Corrida da Ilha.</p>
+      <div class="botoes">
+        <button id="botaoNovaVida">Nova vida</button>
+        <button id="botaoContinuarVida" class="escondido">Continuar vida</button>
+        <button id="botaoJogar" class="secundario">Modo livre</button>
+        <button id="botaoNovaIlha" class="secundario">Gerar outra ilha</button>
+        <button id="botaoQualidade" class="secundario">Gráficos: Bonito</button>
+      </div>
+      <p class="pequeno">Ilha nº <span id="numeroIlha"></span> · Se o jogo ficar lento, use "Gráficos: Leve".</p>
+    </div>
+  </div>
+
+  <!-- Janela de diálogo (lojas, empregos...) -->
+  <div id="dialogo" class="dialogo escondido">
+    <div class="caixa-dialogo">
+      <h2 id="dialogoTitulo"></h2>
+      <div id="dialogoTexto" class="texto-dialogo"></div>
+      <div id="dialogoOpcoes" class="opcoes-dialogo"></div>
+      <button id="dialogoFechar" class="secundario fechar-dialogo">Fechar (Esc)</button>
+    </div>
+  </div>
+
+  <!-- Pausa -->
+  <div id="telaPausa" class="tela escondido">
+    <h2>Pausado</h2>
+    <div class="botoes">
+      <button id="botaoContinuar">Continuar</button>
+      <button id="botaoMenu" class="secundario">Menu</button>
+    </div>
+  </div>
+
+  <!-- Biblioteca 3D (incluída no projeto, funciona sem internet) -->
+  <script src="lib/three.min.js"></script>
+
+  <!-- Código do jogo: a ordem importa -->
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/entrada.js"></script>
+  <script src="js/som.js"></script>
+  <script src="js/terreno.js"></script>
+  <script src="js/casas.js"></script>
+  <script src="js/natureza.js"></script>
+  <script src="js/fundo-do-mar.js"></script>
+  <script src="js/modelos.js"></script>
+  <script src="js/itens.js"></script>
+  <script src="js/animais.js"></script>
+  <script src="js/vida-marinha.js"></script>
+  <script src="js/moradores.js"></script>
+  <script src="js/aviao.js"></script>
+  <script src="js/historias.js"></script>
+  <script src="js/graficos.js"></script>
+  <script src="js/agua.js"></script>
+  <script src="js/ceu.js"></script>
+  <script src="js/clima.js"></script>
+  <script src="js/grama.js"></script>
+  <script src="js/particulas.js"></script>
+  <script src="js/carro.js"></script>
+  <script src="js/pessoa.js"></script>
+  <script src="js/barco.js"></script>
+  <script src="js/camera.js"></script>
+  <script src="js/acoes.js"></script>
+  <script src="js/missoes.js"></script>
+  <script src="js/hud.js"></script>
+  <script src="js/comandos.js"></script>
+  <script src="js/dialogo.js"></script>
+  <script src="js/lugares.js"></script>
+  <script src="js/empregos.js"></script>
+  <script src="js/vida.js"></script>
+  <script src="js/toque.js"></script>
+  <script src="js/jogo.js"></script>
+</body>
+</html>
