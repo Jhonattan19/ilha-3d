@@ -45,6 +45,7 @@ const CONFIG = {
     rampas: 6,
     casas: 14,
     moradores: 18,
+    trafego: { carros: 7, motos: 4 },   // veículos dos moradores rodando no anel
     arvores: 1100,
     pedras: 260,
     animais: { caranguejo: 24, capivara: 12, cabra: 12, javali: 8, galinhasPorCasa: 2, gaivotas: 14, golfinhos: 10, cardumes: 32, peixesPorCardume: 11 },
@@ -81,6 +82,7 @@ const EH_CELULAR = (() => {
 
 if (EH_CELULAR) {
   const q = CONFIG.quantidade;
+  q.trafego = { carros: 4, motos: 2 };
   Object.assign(q, { arvores: 600, pedras: 150, algas: 700, corais: 220, estrelasDoMar: 70, ouricos: 50, conchas: 50, pedrasDoFundo: 40, moradores: 12 });
   Object.assign(q.animais, { cardumes: 18, golfinhos: 6 });
   Object.assign(q.mar, { aguasVivas: 22, tartarugas: 8, arraias: 6 });

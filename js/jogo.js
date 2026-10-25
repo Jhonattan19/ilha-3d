@@ -111,9 +111,11 @@ const Jogo = {
       Animais.liberar(this.cena);
       VidaMarinha.liberar(this.cena);
       Moradores.liberar(this.cena);
+      Trafego.liberar(this.cena);
       ItensNoMundo.liberar(this.cena);
       Natureza.liberar(this.cena);
       Casas.liberar(this.cena);
+      Quintais.liberar(this.cena);
       FundoDoMar.liberar(this.cena);
       Pier.liberar(this.cena);
       Terreno.liberar(this.cena);
@@ -123,8 +125,10 @@ const Jogo = {
       Terreno.gerar(semente, this.cena);
       Casas.gerar(semente, this.cena);
       Pier.gerar(this.cena);
+      Quintais.planejar();        // onde vão ficar cercas, caminhos e calçadas
       Graficos.prepararMundo();   // mapas de altura e de grama (para a água e a grama)
       Natureza.gerar(semente, this.cena);
+      Quintais.construir(this.cena);
       Lugares.gerar(this.cena);   // quiosques do modo Nova Vida (precisam das árvores para não cair em cima delas)
       Terreno.criarSinalizacao(); // faixas de pedestre na frente das casas, dos quiosques e na praça
       Aeroclube.gerar(this.cena); // hangar da pista de pouso
@@ -133,6 +137,7 @@ const Jogo = {
       Animais.gerar(semente, this.cena);
       VidaMarinha.gerar(semente, this.cena);
       Moradores.gerar(semente, this.cena);
+      Trafego.gerar(semente, this.cena);
       Historias.prepararMundo();  // alguns moradores ganham uma história e uma missão
       this.historiasCarregadas = false;
       this.noAviao = false;
@@ -609,6 +614,7 @@ const Jogo = {
     FundoDoMar.atualizar();
     if (!menu) { VidaMarinha.atualizar(dt, this); Moradores.atualizar(dt, this); Historias.atualizar(dt, this); }
     Aeroclube.atualizar(menu ? null : this, dt);
+    Trafego.atualizar(dt, this);
     Terreno.atualizarPraca(alvo.posicao);
     Particulas.atualizar(dt);
     if (!menu) { Vida.atualizar(dt, this); Empregos.atualizar(dt, this); }

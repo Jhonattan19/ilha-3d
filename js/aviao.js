@@ -22,12 +22,12 @@ const Aeroclube = {
     const P = Terreno.pista;
     if (!P) return;
     // Hangar ao lado da cabeceira, virado para a pista
-    const pontoHangar = Terreno.doPistaParaMundo(-P.comprimento / 2 + 22, P.largura / 2 + 20);
+    const pontoHangar = Terreno.lugarDoHangar();
     const y = Terreno.alturaTerreno(pontoHangar.x, pontoHangar.z);
     const g = new THREE.Group(), M = (...a) => Modelos.peca(g, ...a);
     g.position.set(pontoHangar.x, y, pontoHangar.z);
     g.rotation.y = Math.atan2(-P.dz, P.dx);      // a frente (+z) olha para a pista
-    M("cubo", 0x9ca3af, [16, 0.3, 14], [0, -0.1, 0]);
+    M("cubo", 0x9ca3af, [16, 0.3, 14], [0, -0.13, 0]);       // piso (rente ao chão, que é plano aqui)
     M("cubo", 0xe5e7eb, [16, 6, 0.3], [0, 3, -7]);                       // fundo
     for (const lado of [-1, 1]) M("cubo", 0xe5e7eb, [0.3, 6, 14], [lado * 8, 3, 0]);
     // Telhado de duas águas (vermelho) e as "tesouras" de madeira nas pontas
@@ -77,6 +77,23 @@ const Aeroclube = {
   },
 
   // Abre o hangar quando o avião é liberado
+  // Se quem você controla está dentro do hangar, a câmera não pode ficar do lado de fora
+  // das paredes (ela é "presa" dentro; só a frente, que é aberta, deixa sair)
+  segurarCamera(camera, foco) {
+    const h = this.hangar;
+    if (!h) return;
+    const cos = Math.cos(h.rotacao), sin = Math.sin(h.rotacao);
+    const local = (x, z) => { const dx = x - h.x, dz = z - h.z; return { x: dx * cos - dz * sin, z: dx * sin + dz * cos }; };
+    const f = local(foco.x, foco.z);
+    if (Math.abs(f.x) > 8 || f.z < -7 || f.z > 7) return;          // você está fora do hangar
+    const c = local(camera.position.x, camera.position.z);
+    c.x = Util.limitar(c.x, -7.3, 7.3);
+    c.z = Math.max(c.z, -6.3);
+    camera.position.x = h.x + c.x * cos + c.z * sin;
+    camera.position.z = h.z - c.x * sin + c.z * cos;
+    camera.position.y = Math.min(camera.position.y, h.y + 5.4);     // e abaixo do telhado
+  },
+
   // Fecha a porta na hora (ilha nova, avião ainda trancado)
   abrir(liberado) {
     if (!this.porta) return;

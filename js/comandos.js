@@ -37,6 +37,8 @@ const Comandos = {
       if (e.key === "Enter") { this.executar(this.entrada.value); this.fechar(); }
       if (e.key === "Escape") this.fechar();
     });
+    // No celular, fechar o teclado (tocar fora) fecha o console
+    this.entrada.addEventListener("blur", () => setTimeout(() => { if (this.aberto && document.activeElement !== this.entrada) this.fechar(); }, 150));
   },
 
   abrir(texto = "/") {

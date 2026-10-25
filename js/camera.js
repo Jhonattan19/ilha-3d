@@ -42,6 +42,7 @@ const CameraJogo = {
     c.position.lerp(alvo, imediato ? 1 : 1 - Math.exp(-(dentroDeCasa ? 4 : 6) * dt));
     const chao = Casas.alturaChao(c.position.x, c.position.z) + 1;
     if (c.position.y < chao) c.position.y = chao;
+    Aeroclube.segurarCamera(c, p);
     this.olharPara.copy(p).addScaledVector(frente, dentroDeCasa ? 0.6 : 1.5);
     this.olharPara.y += dentroDeCasa ? 0.4 : 1.4;
     c.lookAt(this.olharPara);
@@ -71,6 +72,7 @@ const CameraJogo = {
     c.position.lerp(alvo, imediato ? 1 : 1 - Math.exp(-4 * dt));
     const chao = Math.max(Terreno.alturaTerreno(c.position.x, c.position.z), CONFIG.mundo.nivelAgua) + 1.5;
     if (c.position.y < chao) c.position.y = chao;
+    Aeroclube.segurarCamera(c, p);
     this.olharPara.copy(p).addScaledVector(frente, 12);
     this.olharPara.y += 2;
     c.lookAt(this.olharPara);

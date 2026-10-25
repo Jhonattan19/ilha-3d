@@ -47,7 +47,8 @@ const Natureza = {
       const r = Math.sqrt(sorteio()) * m.raioIlha * 1.05;
       const x = Math.cos(a) * r, z = Math.sin(a) * r;
       if (Casas.ocupado(x, z, 4)) continue;            // nada de árvore dentro de casa
-      if (Terreno.naPista(x, z, 14)) continue;          // nem na pista de pouso (o avião precisa de espaço)
+      if (Terreno.naPista(x, z, 14)) continue;
+      if (Quintais.noQuintal(x, z, 1.5)) continue;     // nem nos quintais          // nem na pista de pouso (o avião precisa de espaço)
       const h = Terreno.alturaTerreno(x, z);
       const dEstrada = Terreno.estradaMaisProxima(x, z).distancia;
       if (aceitar(h, Terreno.inclinacao(x, z), dEstrada)) lugares.push({ x, z, h, escala: 0.75 + sorteio() * 0.8 });

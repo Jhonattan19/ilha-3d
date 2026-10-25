@@ -29,14 +29,24 @@ const Toque = {
 
   // ---------- Teclas de mentira ----------
 
-  pressionar(codigo) {
-    if (!Entrada.teclas.has(codigo)) Entrada.apertadas.add(codigo);
-    Entrada.teclas.add(codigo);
+  // Cada tecla pode estar sendo segurada por mais de um lugar ao mesmo tempo
+  // (ex.: o pedal de acelerar E o analógico para cima). Ela só é solta quando
+  // nenhum deles segura mais.
+  fontes: {},
+
+  segurar(fonte, codigo, ligada) {
+    const quem = this.fontes[codigo] || (this.fontes[codigo] = new Set());
+    if (ligada) {
+      if (!quem.size) { if (!Entrada.teclas.has(codigo)) Entrada.apertadas.add(codigo); Entrada.teclas.add(codigo); }
+      quem.add(fonte);
+    } else {
+      quem.delete(fonte);
+      if (!quem.size) Entrada.teclas.delete(codigo);
+    }
   },
 
-  soltar(codigo) {
-    Entrada.teclas.delete(codigo);
-  },
+  pressionar(codigo) { this.segurar("botao", codigo, true); },
+  soltar(codigo) { this.segurar("botao", codigo, false); },
 
   // ---------- Montagem dos controles ----------
 
@@ -51,7 +61,12 @@ const Toque = {
         <button data-tecla="Space" class="bt medio" id="btEspaco"><b>⤒</b><small id="rotuloEspaco">pular</small></button>
         <button data-tecla="ShiftLeft" class="bt medio" id="btShift"><b>⚡</b><small id="rotuloShift">correr</small></button>
       </div>
+      <div class="pedais-toque">
+        <button data-tecla="KeyW" class="bt pedal"><b>▲</b><small>acelera</small></button>
+        <button data-tecla="KeyS" class="bt pedal"><b>▼</b><small>freia / ré</small></button>
+      </div>
       <div class="atalhos-toque">
+        <button id="btTempo" class="bt pequeno">🌤️</button>
         <button data-tecla="KeyP" class="bt pequeno"><b style="font-size:15px">II</b></button>
         <button data-tecla="KeyC" class="bt pequeno">📷</button>
         <button data-tecla="KeyR" class="bt pequeno">🛟</button>
@@ -76,6 +91,28 @@ const Toque = {
     });
 
     this.prepararJoystick();
+    document.getElementById("btTempo").addEventListener("click", () => this.abrirTempo());
+  },
+
+  // Janela de tempo e clima (o mesmo que os comandos /tempo e /clima do computador)
+  abrirTempo() {
+    if (Jogo.estado !== "jogando") return;
+    const c = cmd => () => { Comandos.executar(cmd); };
+    Dialogo.abrir({
+      titulo: "🌤️ Tempo e clima",
+      texto: `<p>Agora são <b>${Ceu.textoHora()}</b>. Escolha a hora do dia ou o clima:</p>`,
+      opcoes: [
+        { rotulo: "🌅 Manhã (7h)", acao: c("/tempo manha") },
+        { rotulo: "☀️ Meio-dia (12h)", acao: c("/tempo meio-dia") },
+        { rotulo: "🌇 Tarde (15h30)", acao: c("/tempo tarde") },
+        { rotulo: "🌙 Noite (21h)", acao: c("/tempo noite") },
+        { rotulo: Ceu.parado ? "🕒 Soltar o relógio" : "🕒 Parar o relógio", acao: c(Ceu.parado ? "/tempo continuar" : "/tempo parar") },
+        { rotulo: "☀️ Sol", acao: c("/clima sol") },
+        { rotulo: "🌧️ Chuva", acao: c("/clima chuva") },
+        { rotulo: "❄️ Neve", acao: c("/clima neve") },
+        { rotulo: "⌨️ Digitar um comando", acao: () => { setTimeout(() => Comandos.abrir("/"), 50); } }
+      ]
+    });
   },
 
   // Analógico: a distância do dedo até o centro vira as teclas W/A/S/D
@@ -90,15 +127,17 @@ const Toque = {
       bolinha.style.transform = `translate(${dx}px, ${dy}px)`;
       const nx = dx / raio, ny = dy / raio;
       // Um pouquinho de "zona morta" no meio para não andar sem querer
-      const teclas = { KeyW: ny < -0.3, KeyS: ny > 0.45, KeyA: nx < -0.35, KeyD: nx > 0.35 };
-      for (const [tecla, ligada] of Object.entries(teclas)) ligada ? this.pressionar(tecla) : this.soltar(tecla);
+      // Dirigindo, o analógico só vira (acelerar e frear ficam nos pedais)
+      const dirigindo = document.body.classList.contains("dirigindo");
+      const teclas = { KeyW: !dirigindo && ny < -0.3, KeyS: !dirigindo && ny > 0.45, KeyA: nx < -0.35, KeyD: nx > 0.35 };
+      for (const [tecla, ligada] of Object.entries(teclas)) this.segurar("analogico", tecla, ligada);
     };
     const soltar = e => {
       if (e.pointerId !== dedo) return;
       dedo = null;
       bolinha.style.transform = "";
       base.classList.remove("ativo");
-      ["KeyW", "KeyA", "KeyS", "KeyD"].forEach(t => this.soltar(t));
+      ["KeyW", "KeyA", "KeyS", "KeyD"].forEach(t => this.segurar("analogico", t, false));
     };
     base.addEventListener("pointerdown", e => {
       e.preventDefault();
@@ -165,6 +204,7 @@ const Toque = {
     this.trocarTexto("rotuloEspaco", espaco);
     this.trocarTexto("rotuloShift", shift);
     this.trocarTexto("rotuloE", jogo.noAviao || jogo.noBarco || !jogo.aPe ? "sair" : "ação");
+    document.body.classList.toggle("dirigindo", !jogo.aPe);
     document.body.classList.toggle("vida-toque", Vida.ativo);
   },
 

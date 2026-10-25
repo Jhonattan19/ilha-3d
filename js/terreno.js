@@ -296,6 +296,10 @@ const Terreno = {
           const pesoPista = (1 - Util.suavizar(P.comprimento / 2, P.comprimento / 2 + T, Math.abs(l.u))) *
                             (1 - Util.suavizar(P.largura / 2 + 4, P.largura / 2 + 4 + T, Math.abs(l.v)));
           if (pesoPista > 0) h = Util.lerp(h, P.y - 0.02, pesoPista);
+          // ... e embaixo do hangar (que fica do lado da pista), para o piso dele ficar rente ao chão
+          const hangar = this.lugarDoHangar();
+          const pesoHangar = 1 - Util.suavizar(13, 26, Math.hypot(x - hangar.x, z - hangar.z));
+          if (pesoHangar > 0) h = Util.lerp(h, P.y - 0.02, pesoHangar);
         }
 
         this.alturas[j * this.lado + i] = h;
@@ -337,6 +341,12 @@ const Terreno = {
       }
     }
     return melhor;
+  },
+
+  // Onde fica o hangar do Aeroclube (aviao.js usa o mesmo ponto)
+  lugarDoHangar() {
+    const P = this.pista;
+    return this.doPistaParaMundo(-P.comprimento / 2 + 22, P.largura / 2 + 20);
   },
 
   // Coordenadas da pista: u = ao longo dela, v = de lado

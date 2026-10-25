@@ -276,7 +276,11 @@ button.secundario:hover { background: rgba(255, 255, 255, 0.24); }
 /* =====================================================================
    Celular (a classe "celular" é colocada pelo toque.js)
    ===================================================================== */
-body.celular { touch-action: none; -webkit-user-select: none; -webkit-touch-callout: none; overscroll-behavior: none; }
+/* (o "touch-action: none" vai só no jogo e nos controles; nas janelas o dedo pode rolar a lista) */
+body.celular { -webkit-user-select: none; -webkit-touch-callout: none; overscroll-behavior: none; }
+body.celular #controlesToque, body.celular .slot { touch-action: none; }
+body.celular .caixa-dialogo { touch-action: pan-y; -webkit-overflow-scrolling: touch; }
+body.celular .opcoes-dialogo { display: grid; grid-template-columns: 1fr 1fr; }
 body.celular #tela { touch-action: none; }
 
 #controlesToque { position: absolute; inset: 0; pointer-events: none; }
@@ -340,7 +344,7 @@ body.celular .bussola { top: 56px; width: 42px; height: 42px; }
 body.celular .bussola .seta { font-size: 19px; }
 body.celular .bussola .distancia { top: 44px; font-size: 10px; }
 body.celular .missao-atual { top: 112px; font-size: 10.5px; max-width: 300px; }
-body.celular .console, body.celular .console-log { display: none; }
+body.celular .console-dica { display: none; }
 body.celular .caixa-dialogo { padding: 12px 16px; max-height: calc(100% - 16px); }
 body.celular .caixa-dialogo h2 { font-size: 18px; margin-bottom: 6px; }
 body.celular .texto-dialogo { font-size: 12px; }
@@ -359,3 +363,14 @@ body.celular .linha-log { font-size: 11px; }
   flex-direction: column; align-items: center; justify-content: center; gap: 12px; font-size: 16px; text-align: center; }
 .aviso-girar div { font-size: 54px; }
 @media (orientation: portrait) { body.celular .aviso-girar { display: flex; } }
+
+/* Pedais (aparecem dirigindo, pilotando ou no barco) */
+.pedais-toque { position: absolute; right: calc(180px + env(safe-area-inset-right)); bottom: 14px; display: none; flex-direction: column; gap: 10px; }
+body.dirigindo .pedais-toque { display: flex; }
+.bt.pedal { width: 64px; height: 76px; border-radius: 14px; }
+.bt.pedal:first-child { background: rgba(34, 197, 94, 0.35); border-color: rgba(134, 239, 172, 0.7); }
+.bt.pedal:last-child { background: rgba(239, 68, 68, 0.3); border-color: rgba(252, 165, 165, 0.6); height: 62px; }
+.bt.pedal.apertado { background: rgba(245, 158, 11, 0.65); }
+/* No celular o console aparece quando aberto pelo botão 🌤️ */
+body.celular .console:not(.escondido) { display: block; bottom: auto; top: 60px; z-index: 30; }
+body.celular .console-log { display: flex; bottom: auto; top: 120px; }

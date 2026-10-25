@@ -226,6 +226,9 @@ const Graficos = {
       ctx.fillRect(-(Casas.L / 2 + 1.5) * escala, -(Casas.P / 2 + 1.5) * escala, (Casas.L + 3) * escala, (Casas.P + 3) * escala);
       ctx.restore();
     }
+    for (const q of Quintais.lista) {           // caminhos e calçadas das casas
+      for (const p of [...q.caminho, ...q.calcada]) { ctx.beginPath(); ctx.arc(px(p.x), px(p.z), 1.3 * escala, 0, Math.PI * 2); ctx.fill(); }
+    }
     if (T.pista) {                              // pista de pouso
       const P = T.pista;
       ctx.save();
@@ -234,7 +237,7 @@ const Graficos = {
       ctx.fillRect(-(P.comprimento / 2 + 4) * escala, -(P.largura / 2 + 3) * escala, (P.comprimento + 8) * escala, (P.largura + 6) * escala);
       ctx.restore();
       // ... e no chão do hangar (mesmo lugar que o aviao.js usa)
-      const h = T.doPistaParaMundo(-P.comprimento / 2 + 22, P.largura / 2 + 20);
+      const h = T.lugarDoHangar();
       ctx.beginPath(); ctx.arc(px(h.x), px(h.z), 12 * escala, 0, Math.PI * 2); ctx.fill();
     }
     const d = Pier.deck;

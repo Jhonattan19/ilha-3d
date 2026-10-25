@@ -79,6 +79,7 @@ const Lugares = {
     if (Terreno.estradaMaisProxima(x, z).distancia < distanciaEstrada) return false;
     if (Casas.ocupado(x, z, 6)) return false;
     if (Terreno.naPista(x, z, 30)) return false;
+    if (Quintais.noQuintal(x, z, 3)) return false;
     if (Terreno.alturaTerreno(x, z) < 1.5 || Terreno.inclinacao(x, z) > 0.3) return false;
     if (Terreno.praca && Math.hypot(x - Terreno.praca.x, z - Terreno.praca.z) < Terreno.praca.raio + 6) return false;
     return this.lista.every(l => Math.hypot(l.x - x, l.z - z) > 15);

@@ -268,6 +268,13 @@ const Hud = {
       g.strokeStyle = "#fb923c"; g.lineWidth = 2.5; g.beginPath(); g.arc(ex, ey, pulso, 0, Math.PI * 2); g.stroke();
     }
 
+    // Carros e motos dos moradores (pontinhos cinza)
+    g.fillStyle = "#cbd5e1";
+    for (const v of Trafego.lista) {
+      const [vx, vy] = this.paraMapa(v.grupo.position.x, v.grupo.position.z);
+      g.fillRect(vx - 1.5, vy - 1.5, 3, 3);
+    }
+
     // Carro estacionado (quando você está a pé)
     if (carroParado) {
       const [sx, sy] = this.paraMapa(carroParado.posicao.x, carroParado.posicao.z);
