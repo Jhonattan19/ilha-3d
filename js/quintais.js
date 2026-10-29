@@ -91,6 +91,7 @@ const Quintais = {
   // Dá para pôr cerca/lajota aqui? (longe das ruas, fora da água, da praça e da pista)
   lugarLivre(x, z, distanciaRua, ignorarEstrada = -1) {
     if (Terreno.alturaTerreno(x, z) < 1) return false;
+    if (AguaDoce.perto(x, z, 0)) return false;
     if (Terreno.naPista(x, z, 6)) return false;
     if (Terreno.praca && Math.hypot(x - Terreno.praca.x, z - Terreno.praca.z) < Terreno.praca.raio + 4) return false;
     for (let k = 0; k < Terreno.estradas.length; k++) {
@@ -107,6 +108,16 @@ const Quintais = {
   },
 
   // Está dentro de algum quintal? (para as árvores não nascerem lá)
+  // O quintal em que o ponto está (ou null)
+  quintalEm(x, z) {
+    for (const q of this.lista) {
+      if (Math.abs(q.casa.x - x) > 25 || Math.abs(q.casa.z - z) > 25) continue;
+      const l = q.casa.paraLocal(x, z);
+      if (l.x > -this.X && l.x < this.X && l.z > -this.FUNDOS && l.z < this.FRENTE) return q;
+    }
+    return null;
+  },
+
   noQuintal(x, z, margem = 0) {
     return this.lista.some(q => {
       const l = q.casa.paraLocal(x, z);

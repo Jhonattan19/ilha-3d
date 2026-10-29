@@ -150,7 +150,7 @@ const Clima = {
     // Respingos no chão perto de você
     for (let k = 0; k < 3 * this.chuva; k++) {
       const x = c.x + (Math.random() - 0.5) * 30, z = c.z + (Math.random() - 0.5) * 30;
-      const y = Math.max(Casas.alturaChao(x, z), Terreno.agua.position.y);
+      const y = Math.max(Casas.alturaChao(x, z), Terreno.nivelAgua(x, z));
       Particulas.emitir(x, y + 0.05, z, { vy: 1.2, vx: (Math.random() - 0.5), vz: (Math.random() - 0.5), cor: "#dbe4f0", tamanho: 0.08, vida: 0.25, gravidade: 8, alfa: 0.7, crescer: 0 });
     }
   },

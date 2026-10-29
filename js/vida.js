@@ -227,8 +227,10 @@ const Vida = {
       this.horaAntes = 7;               // para não contar o dia de novo em atualizar()
       Status.vida = 100;
       Status.fome = Math.max(10, Status.fome - 20);
+      const bonus = h >= 18 ? Empregos.bonusDiario() : 0;
+      if (bonus) { this.estado.dinheiro += bonus; this.estado.ganhoTotal += bonus; }
       this.salvar();
-      Hud.anunciar(`☀️ Bom dia! Dia ${this.estado.dia} · jogo salvo`);
+      Hud.anunciar(`☀️ Bom dia! Dia ${this.estado.dia} · jogo salvo${bonus ? ` · bônus de ${Empregos.nomeNivel(this.estado.emprego)}: +${reais(bonus)}` : ""}`);
     }, 900);
     setTimeout(() => tela.classList.remove("ativo"), 1900);
   },
@@ -305,10 +307,14 @@ const Vida = {
       concessionaria: () => this.janelaConcessionaria(jogo, lugar),
       imobiliaria: () => this.janelaImobiliaria(jogo),
       lanchonete: () => this.janelaLanchonete(),
-      peixaria: () => this.janelaVenda("peixe", "pescador", 30, 18, "vara", 80, "Peixaria"),
-      serraria: () => this.janelaVenda("madeira", "lenhador", 15, 9, "machado", 60, "Serraria")
+      peixaria: () => this.janelaVenda("peixe", "pescador", 10, 5, "vara", 80, "Peixaria"),
+      serraria: () => this.janelaVenda("madeira", "lenhador", 6, 3, "machado", 60, "Serraria")
     }[lugar.tipo];
     if (this.destaque && this.destaque.nome === lugar.nome) this.destaque = null;
+    if (!Lugares.aberto(lugar)) {
+      Som.clique();
+      return Hud.anunciar(`🔒 ${lugar.icone} ${lugar.nome} está fechada agora (${Ceu.textoHora()}). Funciona das ${Lugares.textoHorario(lugar)}`);
+    }
     abrir();
   },
 
@@ -319,7 +325,7 @@ const Vida = {
       const atual = e.emprego === tipo;
       const bloqueado = def.precisaCarro && !temCarro;
       return {
-        rotulo: `${def.icone} ${def.nome} <small>· nível ${Empregos.nivel(tipo)}</small>`,
+        rotulo: `${def.icone} ${def.nome} <small>· ${Empregos.nomeNivel(tipo)} (${Empregos.progresso(tipo)})</small>`,
         detalhe: atual ? "seu emprego atual" : bloqueado ? "precisa ter um carro" : def.ganho,
         desabilitado: atual || bloqueado,
         destaque: atual,
@@ -330,7 +336,7 @@ const Vida = {
     Dialogo.abrir({
       titulo: "💼 Central de Empregos",
       texto: Object.entries(EMPREGOS).map(([, d]) => `<p><b>${d.icone} ${d.nome}:</b> ${d.descricao}</p>`).join("") +
-        `<p class="dica-dialogo">Quanto mais você trabalha numa profissão, mais sobe de nível: cada nível paga 20% a mais.</p>`,
+        `<p class="dica-dialogo">Quanto mais você trabalha numa profissão, mais sobe de nível: Aprendiz (100%), Ajudante (120%), Profissional (145%), Experiente (175%) e Chefe (210%). Do Profissional para cima você ganha um bônus todo dia ao acordar.</p>`,
       opcoes
     });
   },
@@ -487,7 +493,7 @@ const Vida = {
       acao: () => {
         for (let i = 0; i < quantidade; i++) Inventario.gastar(item);
         this.ganhar(quantidade * preco, `${quantidade} ${def.nome.toLowerCase()}(s) vendido(s)`);
-        if (profissional) Empregos.ganharXp(profissao, quantidade * (item === "peixe" ? 1 : 0.5));
+        if (profissional) Empregos.ganharXp(profissao, quantidade * (item === "peixe" ? 0.5 : 0.3));
         this.salvar();
       }
     }];
@@ -501,7 +507,7 @@ const Vida = {
     opcoes.unshift(...this.opcaoContratar(profissao, item === "peixe" ? "peixaria" : "serraria"));
     Dialogo.abrir({
       titulo: `${TIPOS_LUGAR[item === "peixe" ? "peixaria" : "serraria"].icone} ${nomeLoja}`,
-      texto: `<p>Pagamos <b>${reais(preco)}</b> por ${def.nome.toLowerCase()}${profissional ? ` (preço de ${EMPREGOS[profissao].nome.toLowerCase()}, nível ${Empregos.nivel(profissao)})` : `. Quem trabalha de ${EMPREGOS[profissao].nome.toLowerCase()} recebe ${reais(precoProfissional)} ou mais!`}</p>`,
+      texto: `<p>Pagamos <b>${reais(preco)}</b> por ${def.nome.toLowerCase()}${profissional ? ` (preço de ${EMPREGOS[profissao].nome.toLowerCase()} ${Empregos.nomeNivel(profissao)})` : `. Quem trabalha de ${EMPREGOS[profissao].nome.toLowerCase()} recebe ${reais(precoProfissional)} ou mais!`}</p>`,
       opcoes
     });
   }

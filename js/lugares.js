@@ -18,6 +18,12 @@ const TIPOS_LUGAR = {
   serraria:       { nome: "Serraria",            icone: "🪵", cor: 0x92400e }
 };
 
+// Horário de funcionamento de cada um (o dia do jogo dura 15 minutos: 1 hora ≈ 40 segundos)
+const HORARIO_LUGAR = {
+  central: [8, 18], concessionaria: [8, 19], imobiliaria: [8, 18],
+  lanchonete: [6, 23.5], peixaria: [5, 17], serraria: [7, 18]
+};
+
 const Lugares = {
   lista: [],
   porTipo: {},
@@ -80,6 +86,7 @@ const Lugares = {
     if (Casas.ocupado(x, z, 6)) return false;
     if (Terreno.naPista(x, z, 30)) return false;
     if (Quintais.noQuintal(x, z, 3)) return false;
+    if (AguaDoce.perto(x, z, 6)) return false;
     if (Terreno.alturaTerreno(x, z) < 1.5 || Terreno.inclinacao(x, z) > 0.3) return false;
     if (Terreno.praca && Math.hypot(x - Terreno.praca.x, z - Terreno.praca.z) < Terreno.praca.raio + 6) return false;
     return this.lista.every(l => Math.hypot(l.x - x, l.z - z) > 15);
@@ -159,16 +166,22 @@ const Lugares = {
     P("cubo", 0x57534e, [0.1, 0.6, 0.1], [-1.8, 3.3, 2.75]);
     P("cubo", 0x57534e, [0.1, 0.6, 0.1], [1.8, 3.3, 2.75]);
 
-    // Atendente
-    const pessoa = new THREE.Group();
-    const camisas = [0x7c3aed, 0x0891b2, 0xbe123c, 0x15803d];
-    Modelos.peca(pessoa, "cubo", camisas[Math.floor(Math.random() * 4)], [0.5, 0.65, 0.3], [0, 1.25, 0]);
-    Modelos.peca(pessoa, "cubo", 0xc68a5a, [0.32, 0.34, 0.3], [0, 1.8, 0]);
-    Modelos.peca(pessoa, "cubo", 0x1f2937, [0.34, 0.1, 0.32], [0, 2.0, 0]);
-    Modelos.peca(pessoa, "cubo", 0x1e3a8a, [0.45, 0.9, 0.28], [0, 0.5, 0]);
+    // Atendente (uma pessoa de verdade atrás do balcão)
+    const pessoa = Corpo.criar({ ...Corpo.sortear(), camisa: cor, chapeu: false }).grupo;
     pessoa.position.set(0, 0.2, 0.35);
     g.add(pessoa);
     g.userData.atendente = pessoa;
+    // Plaquinha de "FECHADO" (aparece fora do horário)
+    const cf = document.createElement("canvas");
+    cf.width = 256; cf.height = 96;
+    const f = cf.getContext("2d");
+    f.fillStyle = "#b91c1c"; f.fillRect(0, 0, 256, 96);
+    f.fillStyle = "#fff"; f.font = "bold 46px sans-serif"; f.textAlign = "center"; f.textBaseline = "middle"; f.fillText("FECHADO", 128, 50);
+    const fechado = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.6), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cf) }));
+    fechado.position.set(0, 1.75, 1.62);
+    fechado.visible = false;
+    g.add(fechado);
+    g.userData.fechado = fechado;
     return g;
   },
 
@@ -176,6 +189,17 @@ const Lugares = {
     this.ativo = ativo;
     if (this.grupo) this.grupo.visible = ativo;
     for (const l of this.lista) l.obstaculo.raio = ativo ? 2.9 : 0;
+  },
+
+  aberto(l) {
+    const [abre, fecha] = HORARIO_LUGAR[l.tipo] || [0, 24];
+    return Ceu.hora >= abre && Ceu.hora < fecha;
+  },
+
+  textoHorario(l) {
+    const [abre, fecha] = HORARIO_LUGAR[l.tipo] || [0, 24];
+    const h = x => `${Math.floor(x)}h${x % 1 ? String(Math.round(x % 1 * 60)).padStart(2, "0") : ""}`;
+    return `${h(abre)} às ${h(fecha)}`;
   },
 
   // O quiosque cujo balcão está perto de você
@@ -204,6 +228,9 @@ const Lugares = {
     const t = performance.now() / 1000;
     this.lista.forEach((l, i) => {
       const a = l.modelo.userData.atendente;
+      const aberto = this.aberto(l);
+      a.visible = aberto;
+      l.modelo.userData.fechado.visible = !aberto;
       a.rotation.y = Math.sin(t * 0.7 + i) * 0.4;          // olha de um lado para o outro
       a.position.y = 0.2 + Math.abs(Math.sin(t * 1.4 + i)) * 0.03;
     });

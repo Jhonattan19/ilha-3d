@@ -35,14 +35,21 @@ const CONFIG = {
   },
 
   dia: {
-    duracaoSegundos: 300,    // um dia inteiro dura 5 minutos
+    duracaoSegundos: 900,    // um dia inteiro dura 15 minutos, divididos assim:
+    // minutos de cada parte do dia (a soma dá 15). Mude à vontade!
+    periodos: [
+      { nome: "madrugada", de: 0,  ate: 6,  minutos: 2.5 },
+      { nome: "manhã",     de: 6,  ate: 12, minutos: 4.5 },
+      { nome: "tarde",     de: 12, ate: 18, minutos: 4.5 },
+      { nome: "noite",     de: 18, ate: 24, minutos: 3.5 }
+    ],
     horaInicial: 8.5
   },
 
   quantidade: {
     moedas: 40,
     aneis: 16,
-    rampas: 6,
+    rampas: 0,               // (as rampas de salto foram tiradas da ilha)
     casas: 14,
     moradores: 18,
     trafego: { carros: 7, motos: 4 },   // veículos dos moradores rodando no anel
@@ -83,7 +90,7 @@ const EH_CELULAR = (() => {
 if (EH_CELULAR) {
   const q = CONFIG.quantidade;
   q.trafego = { carros: 4, motos: 2 };
-  Object.assign(q, { arvores: 600, pedras: 150, algas: 700, corais: 220, estrelasDoMar: 70, ouricos: 50, conchas: 50, pedrasDoFundo: 40, moradores: 12 });
+  Object.assign(q, { arvores: 600, pedras: 150, algas: 700, corais: 220, estrelasDoMar: 70, ouricos: 50, conchas: 50, pedrasDoFundo: 40, moradores: 14 });
   Object.assign(q.animais, { cardumes: 18, golfinhos: 6 });
   Object.assign(q.mar, { aguasVivas: 22, tartarugas: 8, arraias: 6 });
 }

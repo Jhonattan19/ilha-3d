@@ -198,6 +198,8 @@ const Graficos = {
                                     Math.abs(T.alturaTerreno(x, z + 2) - T.alturaTerreno(x, z - 2))) / 4;
         let v = Util.suavizar(3.6, 5.5, h) * (1 - Util.suavizar(0.45, 0.8, inclinacao)) * (1 - Util.suavizar(46, 52, h));
         v *= 0.75 + 0.25 * T.ruido.ruido(x * 0.03, z * 0.03);    // falhas naturais
+        const doce = AguaDoce.grade && AguaDoce.grade[k];
+        if (doce === doce && h < doce + 0.8) v = 0;                // nada de grama dentro de lago e rio (NaN !== NaN)
         const p = k * 4;
         img.data[p] = img.data[p + 1] = img.data[p + 2] = Math.round(Util.limitar(v, 0, 1) * 255);
         img.data[p + 3] = 255;

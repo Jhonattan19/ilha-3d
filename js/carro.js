@@ -382,7 +382,7 @@ class Carro {
     if (e.estrada === 0) this.indiceEstrada = e.indice; // usado para o resgate (sempre no anel)
     this.distanciaEstrada = e.distancia;
     const h = Terreno.alturaTerreno(p.x, p.z);
-    if (h < CONFIG.mundo.nivelAgua - 0.3) this.superficie = "agua";
+    if (h < Terreno.nivelAgua(p.x, p.z) - 0.6) this.superficie = "agua";   // (rio rasinho dá para atravessar devagar)
     else if (e.distancia < CONFIG.estrada.largura / 2 + 0.5 || Terreno.altura(p.x, p.z) > h + 0.05 || Terreno.naPista(p.x, p.z)) this.superficie = "estrada";
     else if (h < 2) this.superficie = "areia";
     else this.superficie = "grama";
@@ -393,7 +393,7 @@ class Carro {
     const yAntes = p.y;
     this.vy -= CONFIG.carro.gravidade * dt;
     p.y += this.vy * dt;
-    const chao = Terreno.altura(p.x, p.z);
+    const chao = Terreno.altura(p.x, p.z, yAntes);
 
     if (p.y <= chao) {
       if (!this.noChao) this.aterrissar();
@@ -455,17 +455,17 @@ class Carro {
 
   // Água funda: o carro afunda e volta para a estrada
   verificarAgua(dt) {
-    const fundo = Terreno.alturaTerreno(this.posicao.x, this.posicao.z);
+    const nivel = Terreno.nivelAgua(this.posicao.x, this.posicao.z), fundo = Terreno.alturaTerreno(this.posicao.x, this.posicao.z);
     if (this.superficie === "agua" && this.noChao && this.velocidade > 4) {
       for (let i = 0; i < 2; i++) {
-        Particulas.emitir(this.posicao.x, 0.2, this.posicao.z, {
+        Particulas.emitir(this.posicao.x, nivel + 0.2, this.posicao.z, {
           vx: (Math.random() - 0.5) * 4, vy: 3 + Math.random() * 4, vz: (Math.random() - 0.5) * 4,
           cor: "#e0f2fe", tamanho: 0.6, vida: 0.8, gravidade: 12, alfa: 0.8
         });
       }
       Som.agua();
     }
-    if (fundo < -1.8 && this.posicao.y < 0) {
+    if (nivel - fundo > 1.8 && this.posicao.y < nivel) {
       this.afundando += dt;
       if (this.afundando > 1.2 && this.aoAfundar) this.aoAfundar();
     } else {

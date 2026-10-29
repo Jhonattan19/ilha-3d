@@ -26,69 +26,41 @@ class Pessoa {
   // Mostra o item escolhido na mão direita (o braço do lado -x, já que ele olha para +z)
   mostrarNaMao(tipo) {
     if (tipo === this.itemNaMao) return;
-    if (this.modeloNaMao) this.bracos[0].remove(this.modeloNaMao);
+    if (this.modeloNaMao) this.maos[0].remove(this.modeloNaMao);
     this.modeloNaMao = null;
     this.itemNaMao = tipo;
     if (!tipo) return;
     this.modeloNaMao = ItensNoMundo.criarModelo(tipo);
-    this.modeloNaMao.position.set(0, -0.68, 0.06);
-    if (tipo === "vara") this.modeloNaMao.position.set(0, -0.68, 0.55);
-    this.bracos[0].add(this.modeloNaMao);
+    this.modeloNaMao.position.set(0, -0.06, 0.05);
+    if (tipo === "vara") this.modeloNaMao.position.set(0, -0.06, 0.5);
+    this.maos[0].add(this.modeloNaMao);
   }
 
-  golpear() {
-    this.tempoGolpe = 0.3;
+  // Golpe com item: o braço direito sobe e desce. Soco (mao = 0 direita, 1 esquerda):
+  // o braço vai reto para a frente e o corpo gira um pouco para o lado do soco.
+  golpear(mao = null) {
+    this.tempoGolpe = mao === null ? 0.3 : 0.26;
+    this.maoDoSoco = mao;
+  }
+
+  chutar() {
+    this.tempoChute = 0.35;
   }
 
   get velocidade() {
     return Math.abs(this.velocidadeFrente);
   }
 
+  // O corpo vem do corpo.js (o mesmo dos moradores), com as cores do personagem
   criarModelo() {
-    const grupo = new THREE.Group();
-    const pele = new THREE.MeshLambertMaterial({ color: 0xc68a5a });
-    const camisa = new THREE.MeshLambertMaterial({ color: 0x0ea5e9 });
-    const calca = new THREE.MeshLambertMaterial({ color: 0x1e3a8a });
-    const cabelo = new THREE.MeshLambertMaterial({ color: 0x2b1b12 });
-    const tenis = new THREE.MeshLambertMaterial({ color: 0xf8fafc });
-    const cubo = new THREE.BoxGeometry(1, 1, 1);
-
-    const peca = (pai, w, h, d, material, x, y, z) => {
-      const m = new THREE.Mesh(cubo, material);
-      m.scale.set(w, h, d);
-      m.position.set(x, y, z);
-      m.castShadow = true;
-      pai.add(m);
-      return m;
-    };
-
-    // Pernas e braços ficam em "pivôs" (quadril e ombro) para poderem balançar
-    this.pernas = [-0.12, 0.12].map(x => {
-      const pivo = new THREE.Group();
-      pivo.position.set(x, 0.92, 0);
-      peca(pivo, 0.18, 0.82, 0.22, calca, 0, -0.41, 0);
-      peca(pivo, 0.2, 0.1, 0.3, tenis, 0, -0.87, 0.04);
-      grupo.add(pivo);
-      return pivo;
-    });
-    this.bracos = [-0.33, 0.33].map(x => {
-      const pivo = new THREE.Group();
-      pivo.position.set(x, 1.5, 0);
-      peca(pivo, 0.14, 0.55, 0.16, camisa, 0, -0.25, 0);
-      peca(pivo, 0.12, 0.18, 0.13, pele, 0, -0.6, 0);
-      grupo.add(pivo);
-      return pivo;
-    });
-
-    peca(grupo, 0.5, 0.62, 0.28, camisa, 0, 1.22, 0);    // tronco
-    peca(grupo, 0.12, 0.1, 0.12, pele, 0, 1.58, 0);      // pescoço
-    peca(grupo, 0.32, 0.34, 0.3, pele, 0, 1.78, 0);      // cabeça
-    peca(grupo, 0.34, 0.12, 0.32, cabelo, 0, 1.96, -0.01);
-    peca(grupo, 0.34, 0.22, 0.08, cabelo, 0, 1.84, -0.14);
-    const olho = new THREE.MeshBasicMaterial({ color: 0x111111 });
-    peca(grupo, 0.05, 0.05, 0.02, olho, -0.07, 1.8, 0.155);
-    peca(grupo, 0.05, 0.05, 0.02, olho, 0.07, 1.8, 0.155);
-    return grupo;
+    const c = Corpo.criar({ pele: 0xc68a5a, camisa: 0x0ea5e9, calca: 0x1e3a8a, cabelo: 0x2b1b12, sapato: 0xf8fafc,
+                            penteado: "curto", roupa: "camiseta", baixo: "calca", chapeu: false, mulher: false, festeiro: true });
+    this.corpo = c;
+    this.pernas = c.pernas;
+    this.bracos = c.bracos;
+    this.maos = c.maos;
+    c.grupo.traverse(o => { if (o.isMesh) o.castShadow = true; });
+    return c.grupo;
   }
 
   // Volta a ser "solto" na ilha (se estava preso na moto ou bicicleta)
@@ -115,6 +87,7 @@ class Pessoa {
       for (const perna of this.pernas) perna.rotation.x = -1.25;
     }
     for (const braco of this.bracos) braco.rotation.x = -1.05;
+    Corpo.articular(this.corpo);
   }
 
   colocarEm(x, z, direcao) {
@@ -143,7 +116,7 @@ class Pessoa {
   atualizar(dt, controle) {
     const p = this.posicao;
     // Água funda (mais que o peito): começa a nadar
-    const superficie = Terreno.agua ? Terreno.agua.position.y : 0;
+    const superficie = Terreno.nivelAgua(p.x, p.z);   // mar, lago ou rio
     const fundo = Terreno.alturaTerreno(p.x, p.z);
     if (this.nadando || (superficie - fundo > 1.35 && p.y < superficie - 0.9 && Pier.altura(p.x, p.z) === -Infinity)) {
       return this.nadar(dt, controle, superficie);
@@ -164,7 +137,7 @@ class Pessoa {
     Lugares.resolverCirculo(p, this.raio);
     this.baterNosObstaculos(p);
     Pier.segurarNaCerca(p, antes);
-    const chaoNovo = Casas.alturaChao(p.x, p.z);
+    const chaoNovo = Casas.alturaChao(p.x, p.z, p.y);
     if (chaoNovo - p.y > 0.55 && this.noChao) {
       p.x = antes.x;
       p.z = antes.z;
@@ -174,7 +147,7 @@ class Pessoa {
     if (d > limite) { p.x *= limite / d; p.z *= limite / d; }
 
     // Pulo e gravidade
-    const chao = Casas.alturaChao(p.x, p.z);
+    const chao = Casas.alturaChao(p.x, p.z, p.y);
     if (controle.pular && this.noChao) {
       this.vy = 6.5;
       this.noChao = false;
@@ -275,6 +248,7 @@ class Pessoa {
       this.pernas[0].rotation.x = Math.sin(this.fase * 1.3) * 0.4;
       this.pernas[1].rotation.x = -Math.sin(this.fase * 1.3) * 0.4;
     }
+    Corpo.articular(this.corpo);
     // Barulhinho de braçada na superfície
     const braçada = Math.floor(this.fase / Math.PI);
     if (!this.submerso && v > 0.6 && braçada !== this.ultimaBracada) {
@@ -305,7 +279,25 @@ class Pessoa {
     // Braço direito: segura o item à frente; no golpe, ergue e desce rápido
     const tipoItem = this.itemNaMao && ITENS[this.itemNaMao].tipo;
     const segurando = tipoItem === "arma" || tipoItem === "ferramenta";
-    if (this.tempoGolpe > 0) {
+    // Chute: a perna direita vai para a frente e volta
+    if (this.tempoChute > 0) {
+      this.tempoChute -= dt;
+      const t = 1 - Math.max(0, this.tempoChute) / 0.35;
+      this.pernas[0].rotation.x = -Math.sin(t * Math.PI) * 1.3;
+    }
+    let giroCorpo = 0;
+    if (this.tempoGolpe > 0 && this.maoDoSoco !== null) {
+      // Soco: estica rápido (primeiro terço) e volta devagar; a outra mão fica em guarda
+      this.tempoGolpe -= dt;
+      const t = 1 - Math.max(0, this.tempoGolpe) / 0.26;
+      const estica = t < 0.35 ? t / 0.35 : 1 - (t - 0.35) / 0.65;
+      const soco = this.bracos[this.maoDoSoco], guarda = this.bracos[1 - this.maoDoSoco];
+      soco.rotation.x = -0.9 - estica * 0.75;
+      soco.rotation.z = (this.maoDoSoco === 0 ? 1 : -1) * estica * 0.25;   // fecha para o meio
+      guarda.rotation.x = -1.2;
+      guarda.rotation.z = (this.maoDoSoco === 0 ? 1 : -1) * 0.2;
+      giroCorpo = (this.maoDoSoco === 0 ? 1 : -1) * estica * 0.35;          // gira o tronco junto
+    } else if (this.tempoGolpe > 0) {
       this.tempoGolpe -= dt;
       this.bracos[0].rotation.x = -2.4 + (1 - this.tempoGolpe / 0.3) * 2.2;
     } else if (this.itemNaMao === "vara" && Acoes.pesca) {
@@ -316,8 +308,12 @@ class Pessoa {
 
     this.modelo.position.copy(this.posicao);
     this.modelo.position.y += Math.abs(Math.sin(this.fase)) * 0.05 * Math.min(1, v / 4);
+    if (!(this.tempoGolpe > 0 && this.maoDoSoco !== null)) { this.bracos[0].rotation.z = 0; this.bracos[1].rotation.z = 0; }
     this.modelo.rotation.x = 0;
-    this.modelo.rotation.y = this.direcao;
+    this.modelo.rotation.y = this.direcao + giroCorpo;
+    Corpo.articular(this.corpo, this.tempoGolpe > 0 && this.maoDoSoco !== null ? this.maoDoSoco : null);
+    this.corpo.olharEmVolta = v > 1 ? 0.15 : 0.6;       // andando olha para a frente; parado, olha em volta
+    Corpo.viver(this.corpo, dt);
 
     if (this.noChao && v > 1 && Math.floor(this.fase / Math.PI) !== this.ultimoPasso) {
       this.ultimoPasso = Math.floor(this.fase / Math.PI);
@@ -339,6 +335,7 @@ class Pessoa {
     for (const perna of this.pernas) perna.rotation.x = -1.45;
     this.bracos[1].rotation.x = -0.9;
     this.bracos[0].rotation.x = this.itemNaMao === "vara" && Acoes.pesca ? -1.1 : -0.9;
+    Corpo.articular(this.corpo);
   }
 
   esconder() {

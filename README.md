@@ -1,7 +1,7 @@
 # Ilha Livre 3D
 
 Mundo aberto em 3D no navegador: uma ilha inteira criada por código, com
-estrada, morros, praias, árvores, água, rampas, ciclo de dia e noite e
+estrada, morros, praias, árvores, água, ciclo de dia e noite e
 sombras em tempo real. Feito com HTML, CSS, JavaScript e a biblioteca
 **Three.js** (que já vem dentro da pasta `lib`, então funciona sem internet).
 
@@ -24,6 +24,9 @@ O jogo detecta sozinho quando está num celular e:
   e **toque no inventário** para escolher o item;
 - começa no gráfico **Leve**, com menos árvores, bichos e moradores, e resolução menor;
 - deixa o HUD compacto e pede para **deitar o celular**.
+
+- **Dirigindo no celular:** aparecem os pedais **ACELERA** e **FREIA / RÉ**. É só segurar o pedal que o carro vai acelerando, e o analógico serve só para virar.
+- **Botão 🌤️:** abre o menu "Tempo e clima" para escolher manhã, meio-dia, tarde ou noite, parar o relógio, sol, chuva ou neve, ou **digitar um comando** (igual ao console do computador).
 
 ### Publicar no GitHub Pages (para abrir no celular por um link)
 
@@ -85,6 +88,16 @@ Cada emprego sobe de **nível** (até o 5) conforme você trabalha, e cada níve
 - **Objetivo**: ter a Casa de praia e o carro esportivo.
 - Para testar: `/dinheiro 5000` no console.
 
+## História principal e missões (Nova Vida)
+
+- **📖 História principal, "O tesouro do Barba-Ruiva"** (com o Tião do farol):
+  1. **O mapa do pirata**: ache os 3 pedaços do mapa espalhados pela ilha.
+  2. **A chave do Barba-Ruiva**: mergulhe perto do farol e pegue a chave de ouro.
+  3. **O tesouro da ilha**: de noite, suba até o X no ponto mais alto da ilha e abra o baú. É o **final da história**!
+- **Missões novas**: café da manhã da Dona Maria (feira), nadar com golfinhos (Lucas), hat-trick no campo (Rafael), banhista em perigo (Bia, salva-vidas), entrega da feira (Seu Antônio), pane seca (Juliana, posto) e o ladrão de bicicletas (Cabo Marcos, delegacia). Ao todo são **17 missões**.
+- Alguns moradores têm várias missões, uma depois da outra: quando você termina uma, aparece outro "!".
+- **📜 Diário de missões**: tecla **N** (no celular, o botão 📜). Mostra o que já foi feito, o que está disponível, quem pede cada missão e onde a pessoa trabalha. Dá para desistir da missão atual por ali.
+
 ## Missões, eventos e a pista de pouso
 
 Na Nova Vida, alguns moradores têm um **"!" amarelo** em cima da cabeça (e um ponto amarelo no minimapa):
@@ -98,7 +111,7 @@ na bússola e no quadro de missão no alto da tela.
 | 💊 Tia Cida | arrumar um remédio e levar para a vizinha |
 | 📦 Pedro | levar uma encomenda até o píer em 90 segundos |
 | 💎 Lucas | mergulhar e resgatar o baú do avô no fundo do mar |
-| 🏁 Rafael | completar a Corrida da Ilha |
+| ⚽ Rafael | fazer um gol no Campo da Ilha |
 | ✈️ Comandante Rita | aparece depois que você ajudar 4 pessoas: libera a pista e o avião! |
 
 De tempos em tempos acontece um **evento surpresa** perto de você (luz laranja): pneu furado
@@ -120,6 +133,74 @@ Acelere na pista e, passando de ~85 km/h, segure **Espaço** para decolar. Para 
 a pista e **tire a potência (S)**: ele desce sozinho. Chegue com as asas retas e sem mergulhar.
 Bater em árvore, casa ou cair na água é pouso forçado (o avião volta para o hangar).
 Atalho de teste: `/aviao` no console libera o avião.
+Outros atalhos de teste: `/policia 3` (estrelas de procurado) e `/gasolina 100` (enche o tanque na Nova Vida).
+
+## Lagos e rios
+
+- Cada ilha ganha **2 lagos** e até **2 rios**. Um rio sai de um lago e outro nasce num morro, e os dois descem até o mar.
+- O rio que nasce no morro começa como um **fio d'água** (uma nascente entre pedras, com bolhinhas) e vai **engrossando** até virar rio largo perto do mar.
+- Onde o rio cruza uma estrada tem **ponte de verdade**: o carro passa por cima e, por baixo, a água corre. Dá para nadar ou andar pelo rio passando embaixo da ponte. Se o rio cruza de viés, a ponte fica mais comprida.
+- Dá para **nadar e mergulhar** nos lagos, **pescar** neles e nos rios, e o carro **afunda** se entrar no lago. O rio é rasinho e dá para atravessar devagar.
+- Casas, árvores e construções não nascem dentro da água. No minimapa, lagos e rios aparecem em azul.
+- Tudo é calculado em `js/aguadoce.js`: o rio "desce o morro" passo a passo, sempre pelo lado mais baixo, até chegar no mar.
+
+## Polícia (estilo GTA, sem ninguém morrer)
+
+- Bater em morador, atropelar alguém, bater forte no trânsito ou de frente numa viatura dá **estrelas de procurado** (até ★★★★★). Quanto mais estrelas, mais viaturas e mais rápidas.
+- Para se livrar: **suma da vista** da polícia e das testemunhas. Esconda-se **dentro de uma casa**, **no meio do mato**, **debaixo d'água**, atrás de casas e morros, ou fuja para bem longe. Quando as estrelas piscam, estão te procurando; fique escondido até elas sumirem.
+- Se uma viatura te pegar parado, você é **preso**: na Nova Vida paga multa e o veículo vai para o pátio. Na porta da 🚔 Delegacia dá para se entregar e pagar só metade da multa.
+- Os moradores continuam não morrendo: caem, reclamam e levantam.
+
+## Lugares novos
+
+- ⛽ **Posto de gasolina**: na Nova Vida a gasolina acaba. Pare nas bombas e aperte E para abastecer. Se acabar no meio do caminho, aperte **R** e o guincho te leva ao posto por R$ 40.
+- 🚦 **Semáforos** nos cruzamentos: os carros e motos dos moradores param no vermelho.
+- ⚽ **Campo de futebol** com bola de verdade: encoste para conduzir, F (mão vazia) chuta. Faça gol!
+- 🧺 **Feira** perto da praça (6h às 14h): frutas, pastel e água de coco.
+- 🗼 **Farol**: de noite o facho de luz gira.
+- 🛟 **Salva-vidas** na praia: a bandeira mostra se o mar está calmo, e ele te tira da água se você estiver se afogando.
+
+## Estações e datas especiais
+
+No menu, o botão **Estação** troca entre: Automática (segue a data de verdade, com as estações do Brasil), Ciclo (muda a cada 2 dias do jogo) ou uma estação fixa. Também dá com `/estacao natal`, `/outono` etc.
+
+- 🌸 **Primavera**: ipês rosas e amarelos, grama bem verde com florzinhas e pétalas caindo.
+- ☀️ **Verão**: tudo verde e quase nunca neva.
+- 🍂 **Outono**: folhas vermelhas, laranjas e amarelas caindo das árvores, e a grama seca.
+- ❄️ **Inverno**: a maioria das árvores fica só nos galhos, e neva mais.
+- 🎃 **Halloween** (24/out a 2/nov): abóboras com cara na porta das casas, que acendem de noite, morcegos, neblina roxa e chapéu de bruxa nos moradores.
+- 🎄 **Natal** (dezembro até 6/jan): árvore de Natal gigante perto da praça, com presentes, pisca-pisca nas casas e gorro de Papai Noel.
+
+## Rotina da ilha
+
+- Um dia inteiro dura **15 minutos**: madrugada 2,5 min, manhã 4,5 min, tarde 4,5 min e noite 3,5 min. Para mudar, edite `periodos` em `js/config.js`.
+- Os moradores têm casa, profissão e horário: trabalham de manhã e à tarde, almoçam ao meio-dia, vão para o campo, a praia ou a praça no fim da tarde e dormem em casa à noite. Converse para saber o que cada um faz.
+- As lojas têm horário (a Central de Empregos, por exemplo, abre das 8h às 18h). Fora do horário aparece a placa **FECHADO**.
+- De madrugada metade dos carros dos moradores fica em casa.
+
+## Empregos e níveis
+
+- Os níveis são **Aprendiz → Ajudante → Profissional → Experiente → Chefe** e pagam 100%, 120%, 145%, 175% e 210%. Do Profissional para cima você ganha um bônus todo dia ao acordar.
+- Os ganhos foram equilibrados: a tora agora paga R$ 6 e o peixe R$ 10. Você carrega no máximo 12 toras ou 15 peixes por vez, e árvore grande precisa de mais machadadas.
+
+## Salvar no modo livre
+
+- O modo livre salva sozinho a cada 20 segundos e quando você sai. No menu aparece **Continuar modo livre**.
+
+## Pessoas com jeito de gente
+
+- Você e os moradores têm anatomia de gente: tronco "torneado" com peito, cintura e quadril (diferente para homem e mulher), braços com bíceps e antebraço, coxa e panturrilha, mãos com dedos e polegar, tênis com sola e cadarço, e rosto com mandíbula, queixo, nariz com narinas, lábios, pálpebras, íris e pupilas. Alguns têm barba e cores de olho diferentes. Cada pessoa continua sendo só 9 malhas (`js/corpo.js`).
+- **Rosto pintado:** a cabeça é uma esfera "esculpida" (mandíbula, queixo, nuca) e o rosto é desenhado numa textura: olhos com cílios, íris e brilho, sobrancelhas fio a fio, lábios, bochechas, barba por fazer e a linha do cabelo.
+- **Vida:** todo mundo pisca, respira e vira a cabeça. Os moradores olham para você quando você chega perto.
+
+## Socos
+
+- Com a mão vazia, o F dá socos alternando as duas mãos: direita, esquerda, direita...
+
+## Trânsito e quintais
+
+- Os moradores agora têm **carros e motos** que dão a volta na ilha pela estrada, cada um na sua mão. Eles freiam para não bater no da frente nem em você, **buzinam** se você ficar parado no caminho e, se te pegarem a pé, tiram vida. Cuidado ao atravessar!
+- As casas dos moradores ganharam **quintal com cerca e portão**, **caminho de piso** da porta até a rua, **calçada**, canteiros de flores, arbustos, varal e banco.
 
 ## Moradores e briga
 
@@ -147,11 +228,7 @@ O barco tem uma **vara de pescar** guardada.
 
 ## O que fazer na ilha (modo livre)
 
-- **40 moedas**: na estrada, nos morros, nas praias e algumas **no ar**,
-  depois das rampas. Essas só dá para pegar saltando.
-- **Corrida da Ilha**: passe pelo portal de LARGADA, atravesse os 16 anéis
-  na ordem (a bússola no alto da tela aponta o próximo) e volte ao portal.
-  O recorde fica salvo.
+- **40 moedas**: na estrada, nos morros, nas praias e dentro das casas.
 - **Estradas e vila**: além do anel em volta da ilha, duas estradas cortam o meio
   dela e se cruzam numa **praça com rotatória e chafariz**, com uma vila em volta.
 - **Casas**: 14 casas perto das estradas (quase metade na vila), cada uma com sala, cozinha, quarto,
@@ -272,7 +349,7 @@ ilha-3d/
     ├── utils.js        funções de ajuda e o gerador de ruído
     ├── entrada.js      teclado
     ├── som.js          motor e efeitos sonoros gerados por código
-    ├── terreno.js      relevo, estrada, rampas e água
+    ├── terreno.js      relevo, estrada e água
     ├── casas.js        casas, cômodos, móveis, porta, objetos e colisões
     ├── natureza.js     árvores, pinheiros, coqueiros e pedras (modelos, batidas e corte)
     ├── fundo-do-mar.js algas (com shader de balanço), corais, estrelas-do-mar, ouriços e conchas
@@ -297,6 +374,15 @@ ilha-3d/
     ├── missoes.js      moedas, corrida com anéis, saltos e recorde
     ├── hud.js          painéis, bússola e minimapa
     ├── comandos.js     console de comandos (/tempo, /clima, /dar)
+    ├── quintais.js     cercas, caminhos, calçadas e jardins das casas
+    ├── corpo.js        o corpo das pessoas (cotovelo, joelho, rosto, cabelo, roupa)
+    ├── aguadoce.js     lagos, rios e pontes
+    ├── trafego.js      carros e motos dos moradores na estrada
+    ├── semaforos.js    semáforos nos cruzamentos
+    ├── atracoes.js     posto, delegacia, campo, feira, farol, salva-vidas e a gasolina
+    ├── policia.js      estrelas de procurado, viaturas, esconderijo e prisão
+    ├── salvar-livre.js salvamento do modo livre
+    ├── estacoes.js     estações do ano, Halloween e Natal
     ├── toque.js        controles de toque para celular (analógico, botões, câmera)
     ├── dialogo.js      janela com botões (lojas, empregos)
     ├── lugares.js      quiosques da Nova Vida (onde ficam, modelo, balcão)
@@ -309,7 +395,7 @@ ilha-3d/
 
 1. **Fácil:** em `config.js`, mude `alturaMontanhas` para 120 e veja a ilha virar uma serra.
 2. **Fácil:** mude a cor do carro em `carro.js` (procure `0xe11d48`).
-3. **Médio:** aumente `rampas` para 12 e `moedas` para 80.
+3. **Médio:** aumente `moedas` para 80 (ou coloque as rampas de volta mudando `rampas` para 6).
 4. **Médio:** em `config.js`, aumente `casas` para 12 (elas se espalham sozinhas).
 5. **Médio:** em `casas.js`, coloque uma piscina no quintal das casas.
 6. **Médio:** em `itens.js`, crie um item novo (por exemplo, "Pizza" que tira 60 de fome)

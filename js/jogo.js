@@ -31,6 +31,7 @@ const Jogo = {
 
     this.cena = new THREE.Scene();
     this.camera = CameraJogo.iniciar(window.innerWidth / window.innerHeight);
+    Estacoes.iniciar();
     Ceu.iniciar(this.cena, this.qualidadeAlta);
     Particulas.iniciar(this.cena);
     Clima.iniciar(this.cena);
@@ -64,6 +65,10 @@ const Jogo = {
     document.getElementById("botaoJogar").addEventListener("click", () => this.jogar("livre"));
     document.getElementById("botaoNovaVida").addEventListener("click", () => this.jogar("nova"));
     document.getElementById("botaoContinuarVida").addEventListener("click", () => this.jogar("continuar"));
+    document.getElementById("botaoContinuarLivre").addEventListener("click", () => this.jogar("continuarLivre"));
+    // Fechou a aba ou trocou de app no celular: salva o modo livre
+    window.addEventListener("pagehide", () => SalvarLivre.salvar(this));
+    document.addEventListener("visibilitychange", () => { if (document.hidden) SalvarLivre.salvar(this); });
     document.getElementById("botaoNovaIlha").addEventListener("click", () => this.gerarMundo(Math.floor(Math.random() * 100000)));
     document.getElementById("botaoQualidade").addEventListener("click", () => this.trocarQualidade());
     document.getElementById("botaoContinuar").addEventListener("click", () => this.pausar(false));
@@ -104,8 +109,13 @@ const Jogo = {
     document.getElementById("textoCarregando").classList.remove("escondido");
     document.getElementById("menuBotoes").classList.add("escondido");
 
+    this.sessaoLivre = false;
     setTimeout(() => {
+      Estacoes.liberar(this.cena);
       Missoes.liberar(this.cena);
+      Policia.liberar(this.cena);
+      Semaforos.liberar(this.cena);
+      Atracoes.liberar(this.cena);
       Lugares.liberar(this.cena);
       Aeroclube.liberar(this.cena);
       Animais.liberar(this.cena);
@@ -128,8 +138,11 @@ const Jogo = {
       Quintais.planejar();        // onde vão ficar cercas, caminhos e calçadas
       Graficos.prepararMundo();   // mapas de altura e de grama (para a água e a grama)
       Natureza.gerar(semente, this.cena);
+      AguaDoce.registrarObstaculos();   // muretas das pontes
       Quintais.construir(this.cena);
       Lugares.gerar(this.cena);   // quiosques do modo Nova Vida (precisam das árvores para não cair em cima delas)
+      Atracoes.gerar(semente, this.cena);   // posto, delegacia, campo, feira, farol e salva-vidas
+      Semaforos.gerar(this.cena);           // semáforos nos cruzamentos do anel
       Terreno.criarSinalizacao(); // faixas de pedestre na frente das casas, dos quiosques e na praça
       Aeroclube.gerar(this.cena); // hangar da pista de pouso
       FundoDoMar.gerar(semente, this.cena);
@@ -138,7 +151,9 @@ const Jogo = {
       VidaMarinha.gerar(semente, this.cena);
       Moradores.gerar(semente, this.cena);
       Trafego.gerar(semente, this.cena);
+      Policia.gerar(this.cena);
       Historias.prepararMundo();  // alguns moradores ganham uma história e uma missão
+      Estacoes.gerar(this.cena);  // abóboras, árvore de Natal, pisca-pisca e as cores da estação
       this.historiasCarregadas = false;
       this.noAviao = false;
       this.aviao.modelo.visible = false;
@@ -167,13 +182,17 @@ const Jogo = {
     }, 60);
   },
 
-  // Mostra "Continuar" só se tem uma vida salva
+  // Mostra "Continuar" só se tem uma vida (ou um modo livre) salva
   atualizarBotoesMenu() {
     const salvo = Vida.temSalvamento();
     const botao = document.getElementById("botaoContinuarVida");
     botao.classList.toggle("escondido", !salvo);
     if (salvo) botao.innerHTML = `Continuar vida <small>dia ${salvo.dia} · ${reais(salvo.dinheiro)}</small>`;
     document.getElementById("botaoNovaVida").textContent = "Nova vida";
+    const livre = SalvarLivre.ler(), botaoLivre = document.getElementById("botaoContinuarLivre");
+    botaoLivre.classList.toggle("escondido", !livre);
+    if (livre) botaoLivre.innerHTML = `Continuar modo livre <small>ilha nº ${livre.semente} · ${livre.moedas.length} moedas</small>`;
+    document.getElementById("botaoJogar").textContent = livre ? "Modo livre (do zero)" : "Modo livre";
     this.confirmarNova = false;
   },
 
@@ -213,6 +232,13 @@ const Jogo = {
       if (Vida.ativo && Vida.estado.semente === salvo.semente) return this.comecar();   // só voltou do menu
       return this.gerarMundo(salvo.semente, () => { this.comecar(); Vida.continuar(this, salvo); this.carregarHistorias(); });
     }
+    if (modo === "continuarLivre") {
+      const salvo = SalvarLivre.ler();
+      if (!salvo) return;
+      if (!Vida.ativo && this.sessaoLivre && this.semente === salvo.semente) return this.comecar();   // só voltou do menu
+      if (Vida.ativo) Vida.sair(this);
+      return this.gerarMundo(salvo.semente, () => { this.comecar(); SalvarLivre.aplicar(this, salvo); });
+    }
     if (Vida.ativo) {             // estava na Nova Vida e quer o modo livre: ilha "zerada"
       Vida.sair(this);
       return this.gerarMundo(this.semente, () => this.comecar());
@@ -229,6 +255,7 @@ const Jogo = {
     if (!this.historiasCarregadas && !Vida.ativo) this.carregarHistorias();
     Som.iniciar();
     Som.ligarMotor();
+    if (!Vida.ativo) this.sessaoLivre = true;
     this.estado = "jogando";
     document.getElementById("telaInicio").classList.add("escondido");
     Hud.mostrar(true);
@@ -249,6 +276,7 @@ const Jogo = {
 
   voltarAoMenu() {
     Vida.salvar();
+    SalvarLivre.salvar(this);
     this.atualizarBotoesMenu();
     this.estado = "menu";
     document.getElementById("telaPausa").classList.add("escondido");
@@ -261,6 +289,7 @@ const Jogo = {
     Status.vida = 60;
     Status.fome = Math.max(Status.fome, 40);
     Acoes.cancelarPesca();
+    Policia.zerar();
     if (this.noAviao) this.sairDoAviao(true);
     if (Vida.ativo) {
       if (this.noBarco) { this.noBarco = false; this.barco.atracar(); }
@@ -290,6 +319,10 @@ const Jogo = {
       return Hud.anunciar("Barco de volta ao píer");
     }
     if (!this.temVeiculo) return Hud.anunciar("Você ainda não tem um veículo");
+    if (!this.noBarco && !this.noAviao && Gasolina.vazio(this.carro)) {   // sem gasolina (dirigindo ou a pé): guincho
+      if (this.aPe) this.entrarNoCarro(true);
+      return Gasolina.guincho(this);
+    }
     if (this.aPe) this.entrarNoCarro(true);
     this.carro.colocarNaEstrada(this.ultimaPosicaoSegura);
     CameraJogo.posicionar(this.carro);
@@ -344,6 +377,7 @@ const Jogo = {
     if (Entrada.apertou("KeyT", "Slash", "IntlRo", "NumpadDivide", "Enter")) return Comandos.abrir("/");
     if (Entrada.apertou("KeyH")) Hud.alternarAjuda();
     if (Entrada.apertou("KeyJ") && Vida.ativo) Empregos.alternarPausa();
+    if (Entrada.apertou("KeyN")) return Historias.abrirDiario();
     for (let i = 0; i < Inventario.tamanho; i++) {
       if (Entrada.apertou(`Digit${i + 1}`, `Numpad${i + 1}`)) Inventario.selecionado = i;
     }
@@ -354,7 +388,9 @@ const Jogo = {
     if (this.aPe) return this.atualizarAPe(dt);
     if (Entrada.apertou("KeyC")) Hud.anunciar(CameraJogo.trocarModo());
     if (this.noBarco) return this.atualizarBarco(dt);
-    if (Entrada.apertou("KeyE")) return this.sairDoCarro();
+    // Parado nas bombas do posto (na Nova Vida): E abre a bomba de gasolina
+    const noPosto = Gasolina.temTanque(this.carro) && Atracoes.noPosto(this.carro);
+    if (Entrada.apertou("KeyE")) return noPosto ? Gasolina.janela(this) : this.sairDoCarro();
 
     const esquerda = Entrada.segurando(...TECLAS.esquerda), direita = Entrada.segurando(...TECLAS.direita);
     const controle = {
@@ -364,6 +400,7 @@ const Jogo = {
       freioDeMao: Entrada.segurando(...TECLAS.freioDeMao),
       nitro: Entrada.segurando(...TECLAS.nitro)
     };
+    Gasolina.filtrar(controle, this.carro, dt);
     this.carro.atualizar(dt, controle);
     if (this.carro.def.duasRodas) this.pessoa.montar(this.carro);   // o boneco vai em cima da moto/bicicleta
 
@@ -376,13 +413,13 @@ const Jogo = {
 
     Missoes.atualizar(dt, this.carro);
     this.atualizarMundo(dt);
-    Hud.atualizar(this.carro);
+    Hud.atualizar(this.carro, { acao: noPosto ? "⛽ abastecer" : null });
   },
 
   // ---------- A pé ----------
 
-  sairDoCarro() {
-    if (this.carro.velocidade > 6) return Hud.anunciar("Pare o carro para sair");
+  sairDoCarro(forcado = false) {
+    if (this.carro.velocidade > 6 && !forcado) return Hud.anunciar("Pare o carro para sair");
     const c = this.carro;
     // Desce pelo lado esquerdo do carro
     const ladoX = Math.cos(c.direcao), ladoZ = -Math.sin(c.direcao);
@@ -465,6 +502,7 @@ const Jogo = {
     const distanciaCarro = this.temVeiculo ? Math.hypot(p.posicao.x - this.carro.posicao.x, p.posicao.z - this.carro.posicao.z) : Infinity;
     const objeto = Casas.interativoProximo(p);
     const lugar = Lugares.proximo(p.posicao);
+    const atracao = !p.nadando ? Atracoes.interacao(p) : null;
     // Na Nova Vida, o barco é da cooperativa de pesca
     const barcoLiberado = !Vida.ativo || Vida.estado.emprego === "pescador";
     const nomeVeiculo = { bicicleta: "subir na bicicleta", moto: "subir na moto" }[this.carro.tipo] || "entrar no carro";
@@ -480,7 +518,8 @@ const Jogo = {
     let acao = null;
     if (item) acao = `pegar ${ITENS[item.tipo].nome}${item.quantidade > 1 ? " x" + item.quantidade : ""}`;
     else if (acaoEvento) acao = `📢 ${acaoEvento}`;
-    else if (lugar) acao = `${lugar.icone} falar com a ${lugar.nome}`;
+    else if (lugar) acao = Lugares.aberto(lugar) ? `${lugar.icone} falar com a ${lugar.nome}` : `🔒 ${lugar.nome} fechada (${Lugares.textoHorario(lugar)})`;
+    else if (atracao) acao = atracao.rotulo;
     else if (morador) acao = `🗣️ conversar com ${morador.nome}${Historias.temConversa(morador) ? " ❗" : ""}`;
     else if (pertoDoAviao) acao = "✈️ entrar no avião";
     else if (beiradaPier && !pertoDoBarco) acao = "subir no píer";
@@ -492,6 +531,7 @@ const Jogo = {
       if (item) ItensNoMundo.pegar(item);
       else if (acaoEvento) return Historias.usarAcao();
       else if (lugar) return Vida.abrirLugar(lugar, this);
+      else if (atracao) return atracao.acao();
       else if (morador) { if (Historias.temConversa(morador)) return Historias.conversar(morador); morador.conversar(p.posicao); }
       else if (pertoDoAviao) return this.entrarNoAviao();
       else if (beiradaPier && !pertoDoBarco) { p.colocarEm(beiradaPier.x, beiradaPier.z, p.direcao); Som.agua(); return; }
@@ -600,6 +640,7 @@ const Jogo = {
     }
     Clima.atualizar(dt, this.camera, this.onde ? this.onde.casa : null);
     const dia = Ceu.atualizar(dt, alvo.posicao, this.camera);
+    Estacoes.atualizar(dt, this, dia);   // folhas caindo, pisca-pisca, morcegos...
     VidaMarinha.atualizarVisao(this.camera, this.cena);   // debaixo d'água: tudo azul-esverdeado
     // Lá do alto dá para ver mais longe (a neblina se afasta)
     if (this.noAviao && this.camera.position.y > 40) {
@@ -614,12 +655,16 @@ const Jogo = {
     FundoDoMar.atualizar();
     if (!menu) { VidaMarinha.atualizar(dt, this); Moradores.atualizar(dt, this); Historias.atualizar(dt, this); }
     Aeroclube.atualizar(menu ? null : this, dt);
+    Semaforos.atualizar(dt);
+    Atracoes.atualizar(dt, this, menu);
     Trafego.atualizar(dt, this);
+    if (!menu) { Policia.atualizar(dt, this); SalvarLivre.atualizar(dt, this); }
     Terreno.atualizarPraca(alvo.posicao);
     Particulas.atualizar(dt);
     if (!menu) { Vida.atualizar(dt, this); Empregos.atualizar(dt, this); }
     Lugares.atualizar();
     if (Terreno.agua) Terreno.agua.position.y = CONFIG.mundo.nivelAgua + Math.sin(performance.now() / 1200) * 0.08;
+    AguaDoce.atualizar(dt, alvo.posicao);
   }
 };
 

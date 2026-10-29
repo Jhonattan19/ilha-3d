@@ -225,11 +225,11 @@ class Aviao {
     const vertical = (p.y - yAntes) / Math.max(dt, 1e-4);
 
     // Chão (ou água)
-    const fundo = Terreno.altura(p.x, p.z), chao = Math.max(fundo, CONFIG.mundo.nivelAgua);
+    const fundo = Terreno.altura(p.x, p.z), nivelAgua = Terreno.nivelAgua(p.x, p.z), chao = Math.max(fundo, nivelAgua);
     if (p.y <= chao + 0.1) {
       if (!this.noChao) {
         const forte = vertical < -7.5 || Math.abs(this.roll) > 0.45 || this.pitch < -0.15;
-        if (fundo < CONFIG.mundo.nivelAgua - 0.2) return this.bater("O avião caiu na água!");
+        if (fundo < nivelAgua - 0.2) return this.bater("O avião caiu na água!");
         if (forte) return this.bater("Pouso forçado! Chegou rápido demais no chão");
         this.noChao = true;
         this.queda = 0;
@@ -237,7 +237,7 @@ class Aviao {
         if (this.aoPousar) this.aoPousar(Terreno.naPista(p.x, p.z, 3));
       }
       p.y = chao + 0.1;
-      if (fundo < CONFIG.mundo.nivelAgua - 0.2 && this.velocidade > 2) return this.bater("O avião não anda na água!");
+      if (fundo < nivelAgua - 0.2 && this.velocidade > 2) return this.bater("O avião não anda na água!");
     } else if (this.noChao && p.y > chao + 0.6) {
       this.noChao = false;                 // decolou!
       if (this.aoDecolar) this.aoDecolar();

@@ -48,7 +48,8 @@ const Natureza = {
       const x = Math.cos(a) * r, z = Math.sin(a) * r;
       if (Casas.ocupado(x, z, 4)) continue;            // nada de árvore dentro de casa
       if (Terreno.naPista(x, z, 14)) continue;
-      if (Quintais.noQuintal(x, z, 1.5)) continue;     // nem nos quintais          // nem na pista de pouso (o avião precisa de espaço)
+      if (Quintais.noQuintal(x, z, 1.5)) continue;
+      if (AguaDoce.perto(x, z, -2)) continue;          // nem dentro de lago ou rio     // nem nos quintais          // nem na pista de pouso (o avião precisa de espaço)
       const h = Terreno.alturaTerreno(x, z);
       const dEstrada = Terreno.estradaMaisProxima(x, z).distancia;
       if (aceitar(h, Terreno.inclinacao(x, z), dEstrada)) lugares.push({ x, z, h, escala: 0.75 + sorteio() * 0.8 });
@@ -73,13 +74,17 @@ const Natureza = {
       troncoPinheiro: new THREE.InstancedMesh(this.geoTroncoPinheiro(), matTronco, Math.max(1, pinheiros.length)),
       copaPinheiro: new THREE.InstancedMesh(this.geoCopaPinheiro(), matCopa(), Math.max(1, pinheiros.length)),
       troncoCoqueiro: new THREE.InstancedMesh(this.geoTroncoCoqueiro(), matTronco, Math.max(1, coqueiros.length)),
-      copaCoqueiro: new THREE.InstancedMesh(this.geoCopaCoqueiro(), new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true, side: THREE.DoubleSide }), Math.max(1, coqueiros.length))
+      copaCoqueiro: new THREE.InstancedMesh(this.geoCopaCoqueiro(), new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true, side: THREE.DoubleSide }), Math.max(1, coqueiros.length)),
+      // Galhos pelados: só aparecem no inverno, quando a árvore perde as folhas
+      galhosFolhosa: new THREE.InstancedMesh(this.geoGalhosInverno(), matTronco, Math.max(1, folhosas.length))
     };
     for (const m of Object.values(malhas)) m.count = 0;
 
     // Neve nas copas e balanço do vento (o coqueiro balança mais)
     Clima.aplicarNeve(malhas.copaPinheiro.material, 0.1);
     Clima.aplicarNeve(malhas.copaFolhosa.material, 0.3);
+    malhas.galhosFolhosa.visible = false;
+    this.malhas = malhas;
     Graficos.aplicarVento(malhas.copaFolhosa.material, 0.05);
     Graficos.aplicarVento(malhas.copaPinheiro.material, 0.035);
     Graficos.aplicarVento(malhas.copaCoqueiro.material, 0.09);
@@ -90,7 +95,7 @@ const Natureza = {
     const eixoY = new THREE.Vector3(0, 1, 0);
 
     // Põe a árvore "a" nas malhas de tronco e copa daquele tipo
-    const colocar = (a, tronco, copa, corCopa, inclinar = 0) => {
+    const colocar = (a, tronco, copa, corCopa, inclinar = 0, tipo = "folhosa") => {
       posicao.set(a.x, a.h - 0.2, a.z);
       rotacao.setFromAxisAngle(eixoY, sorteio() * Math.PI * 2);
       if (inclinar) rotacao.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), (sorteio() - 0.5) * inclinar));
@@ -100,14 +105,23 @@ const Natureza = {
       copa.setColorAt(copa.count - 1, corCopa);
       a.tronco = { malha: tronco, i: tronco.count - 1 };
       a.copa = { malha: copa, i: copa.count - 1 };
+      a.tipo = tipo;
+      a.matriz = matriz.clone();                 // para as estações mudarem o tamanho da copa
+      a.corBase = corCopa.clone();               // a cor "de verão" da copa
+      a.r1 = sorteio(); a.r2 = sorteio();        // sorteios fixos: quem vira ipê, quem perde as folhas...
+      if (tipo === "folhosa") {
+        const g = malhas.galhosFolhosa;
+        g.setMatrixAt(g.count++, matriz);
+        a.galhos = { malha: g, i: g.count - 1 };
+      }
       a.obstaculo = this.registrar(a.x, a.z, 0.45 * a.escala + 0.3);
       a.golpes = 0;
     };
 
     // Cores um pouco diferentes em cada árvore (nenhuma é igual à outra)
     folhosas.forEach(a => colocar(a, malhas.troncoFolhosa, malhas.copaFolhosa, cor.setHSL(0.24 + sorteio() * 0.09, 0.38 + sorteio() * 0.14, 0.27 + sorteio() * 0.08)));
-    pinheiros.forEach(a => colocar(a, malhas.troncoPinheiro, malhas.copaPinheiro, cor.setHSL(0.34 + sorteio() * 0.05, 0.4, 0.27 + sorteio() * 0.08)));
-    coqueiros.forEach(a => colocar(a, malhas.troncoCoqueiro, malhas.copaCoqueiro, cor.setHSL(0.2 + sorteio() * 0.06, 0.5, 0.33 + sorteio() * 0.07), 0.3));
+    pinheiros.forEach(a => colocar(a, malhas.troncoPinheiro, malhas.copaPinheiro, cor.setHSL(0.34 + sorteio() * 0.05, 0.4, 0.27 + sorteio() * 0.08), 0, "pinheiro"));
+    coqueiros.forEach(a => colocar(a, malhas.troncoCoqueiro, malhas.copaCoqueiro, cor.setHSL(0.2 + sorteio() * 0.06, 0.5, 0.33 + sorteio() * 0.07), 0.3, "coqueiro"));
     this.listaArvores = [...folhosas, ...pinheiros, ...coqueiros];   // para o lenhador poder derrubar
 
     // IMPORTANTE: nesta versão do Three.js, o InstancedMesh decide se está "na tela"
@@ -189,6 +203,36 @@ const Natureza = {
 
   // Copa: 6 bolas amassadas de tamanhos diferentes. Por dentro e por baixo
   // ficam mais escuras (a luz não chega lá), o que dá volume.
+  // Galhos de inverno: vários galhos subindo do tronco, cada um com galhinhos na ponta
+  geoGalhosInverno() {
+    const marrom = (x, y) => { const t = 0.3 + Math.min(1, y / 6) * 0.12; return [t, t * 0.7, t * 0.48]; };
+    let semente = 7;
+    const r = () => (semente = (semente * 16807) % 2147483647) / 2147483647;
+    const galho = (comprimento, grossura, base, inclinacao, giro) => {
+      const g = new THREE.CylinderGeometry(grossura * 0.35, grossura, comprimento, 4, 1, true);
+      g.translate(0, comprimento / 2, 0);
+      g.rotateZ(inclinacao);
+      g.rotateY(giro);
+      g.translate(base.x, base.y, base.z);
+      // ponta do galho (para pendurar os galhinhos nela)
+      const ponta = new THREE.Vector3(0, comprimento, 0).applyAxisAngle(new THREE.Vector3(0, 0, 1), inclinacao).applyAxisAngle(new THREE.Vector3(0, 1, 0), giro).add(base);
+      return { g, ponta };
+    };
+    const partes = [];
+    const principais = EH_CELULAR ? 7 : 10, galhinhos = EH_CELULAR ? 1 : 2;
+    for (let k = 0; k < principais; k++) {
+      const giro = k / principais * Math.PI * 2 + r() * 0.5;
+      const base = new THREE.Vector3(0, 2.3 + r() * 1.1, 0);
+      const { g, ponta } = galho(1.8 + r() * 1.2, 0.11, base, 0.45 + r() * 0.55, giro);
+      partes.push(g);
+      for (let j = 0; j < galhinhos; j++) {
+        partes.push(galho(0.8 + r() * 0.8, 0.045, ponta, 0.2 + r() * 0.7, giro + (r() - 0.5) * 1.6).g);
+      }
+    }
+    partes.push(galho(1.6, 0.13, new THREE.Vector3(0, 3.2, 0), 0.08, 0).g);   // o "topo" continuando o tronco
+    return this.juntar(partes.map(g => this.pintar(g, marrom)));
+  },
+
   geoCopaFolhosa(detalhe) {
     const bolas = [[0, 4.3, 0, 2.1], [1.4, 3.8, 0.6, 1.5], [-1.3, 3.9, -0.5, 1.6], [0.4, 3.7, -1.4, 1.4], [-0.5, 3.6, 1.4, 1.4], [0.2, 5.5, 0.1, 1.5]];
     // Cada bola tem um tom um pouco diferente (umas mais amareladas, outras mais azuladas)
@@ -347,7 +391,8 @@ const Natureza = {
     a.caida = true;
     a.obstaculo.raio = 0;
     const zero = new THREE.Matrix4().makeScale(0, 0, 0);
-    for (const parte of [a.tronco, a.copa]) {
+    for (const parte of [a.tronco, a.copa, a.galhos]) {
+      if (!parte) continue;
       parte.malha.setMatrixAt(parte.i, zero);
       parte.malha.instanceMatrix.needsUpdate = true;
     }

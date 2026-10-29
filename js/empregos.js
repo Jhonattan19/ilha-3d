@@ -9,7 +9,14 @@
 // Cada tarefa tem um "alvo" (marcado por uma coluna de luz, no minimapa
 // e na bússola) e, nas entregas e corridas, um prazo: chegando a tempo
 // você ganha gorjeta; atrasado, recebe menos.
-// Quanto mais você trabalha num emprego, mais sobe de nível (e mais ganha).
+// Quanto mais você trabalha num emprego, mais sobe de nível (e mais ganha):
+//   Aprendiz → Ajudante → Profissional → Experiente → Chefe.
+// Do nível Profissional para cima você ainda ganha um bônus todo dia ao acordar.
+//
+// Os ganhos foram equilibrados para todos os empregos renderem parecido
+// (uns R$ 60 a 100 por minuto no começo): o lenhador e o pescador ganham
+// pouco por unidade, mas produzem rápido; e só dá para carregar um tanto
+// de cada vez (12 toras ou 15 peixes), aí precisa ir vender.
 // =====================================================================
 
 const EMPREGOS = {
@@ -17,14 +24,19 @@ const EMPREGOS = {
                 descricao: "Busque os pedidos na Lanchonete e entregue nas casas antes do prazo. Dá para fazer de bicicleta." },
   taxista:    { nome: "Motorista de táxi", icone: "🚕", ganho: "R$ 50 a 160 por corrida", precisaCarro: true,
                 descricao: "Pegue passageiros na beira da estrada e leve até o destino. Precisa de um carro." },
-  pescador:   { nome: "Pescador",          icone: "🎣", ganho: "R$ 30 por peixe",
+  pescador:   { nome: "Pescador",          icone: "🎣", ganho: "R$ 10 por peixe",
                 descricao: "A cooperativa empresta o barco do píer e uma vara. Venda os peixes na Peixaria." },
-  lenhador:   { nome: "Lenhador",          icone: "🪓", ganho: "R$ 15 por tora",
+  lenhador:   { nome: "Lenhador",          icone: "🪓", ganho: "R$ 6 por tora",
                 descricao: "Ganhe um machado, derrube árvores e venda as toras na Serraria." }
 };
 
-// Experiência necessária para cada nível (nível 1 a 5)
-const NIVEIS_XP = [0, 5, 15, 30, 50];
+// Experiência necessária para cada nível (nível 1 a 5), o nome e quanto cada um paga
+const NIVEIS_XP = [0, 8, 25, 55, 100];
+const NOMES_NIVEL = ["Aprendiz", "Ajudante", "Profissional", "Experiente", "Chefe"];
+const MULTIPLICADOR_NIVEL = [1, 1.2, 1.45, 1.75, 2.1];
+const BONUS_DIARIO = [0, 0, 40, 90, 160];          // ganha ao acordar, trabalhando nesse emprego
+// Quanto dá para carregar de uma vez
+const LIMITE_CARGA = { madeira: 12, peixe: 15 };
 
 const Empregos = {
   tarefa: null,        // a tarefa atual (entregas e corridas)
@@ -50,18 +62,10 @@ const Empregos = {
   },
 
   criarPassageiro() {
-    const g = new THREE.Group(), P = (...a) => Modelos.peca(g, ...a);
-    P("cubo", 0xfb7185, [0.5, 0.65, 0.3], [0, 1.25, 0]);
-    P("cubo", 0x334155, [0.45, 0.92, 0.26], [0, 0.46, 0]);
-    P("cubo", 0xe0ac69, [0.32, 0.34, 0.3], [0, 1.78, 0]);
-    P("cubo", 0x111827, [0.34, 0.12, 0.32], [0, 1.97, 0]);
-    P("cubo", 0xfb7185, [0.14, 0.55, 0.16], [-0.33, 1.25, 0]);
-    this.bracoAcenando = new THREE.Group();
-    this.bracoAcenando.position.set(0.33, 1.5, 0);
-    Modelos.peca(this.bracoAcenando, "cubo", 0xfb7185, [0.14, 0.55, 0.16], [0, 0.25, 0]);
-    g.add(this.bracoAcenando);
-    P("cubo", 0x92400e, [0.4, 0.3, 0.15], [-0.45, 0.85, 0]);   // malinha
-    return g;
+    const c = Corpo.criar({ ...Corpo.sortear(), camisa: 0xfb7185, chapeu: false });
+    this.bracoAcenando = c.bracos[1];
+    Modelos.peca(c.maos[0], "cubo", 0x92400e, [0.4, 0.3, 0.15], [0, -0.18, 0]);   // malinha
+    return c.grupo;
   },
 
   // ---------- Nível e pagamento ----------
@@ -73,9 +77,24 @@ const Empregos = {
     return n;
   },
 
-  // Nível 1 ganha 100%; cada nível a mais, +20%
+  nomeNivel(tipo) {
+    return NOMES_NIVEL[this.nivel(tipo) - 1];
+  },
+
   multiplicador(tipo) {
-    return 1 + 0.2 * (this.nivel(tipo) - 1);
+    return MULTIPLICADOR_NIVEL[this.nivel(tipo) - 1];
+  },
+
+  // Quanto falta para o próximo nível (texto para as janelas)
+  progresso(tipo) {
+    const n = this.nivel(tipo), xp = Vida.estado.xp[tipo] || 0;
+    if (n >= NIVEIS_XP.length) return "nível máximo";
+    return `${Math.floor(xp)}/${NIVEIS_XP[n]} para ${NOMES_NIVEL[n]}`;
+  },
+
+  bonusDiario() {
+    const e = Vida.estado.emprego;
+    return e ? BONUS_DIARIO[this.nivel(e) - 1] : 0;
   },
 
   ganharXp(tipo, pontos) {
@@ -84,7 +103,7 @@ const Empregos = {
     const depois = this.nivel(tipo);
     if (depois > antes) {
       Som.chegada();
-      setTimeout(() => Hud.anunciar(`⭐ Subiu para o nível ${depois} de ${EMPREGOS[tipo].nome}! Agora você ganha ${Math.round(this.multiplicador(tipo) * 100)}%`), 1800);
+      setTimeout(() => Hud.anunciar(`⭐ Promovido a ${NOMES_NIVEL[depois - 1]} de ${EMPREGOS[tipo].nome}! Agora você ganha ${Math.round(this.multiplicador(tipo) * 100)}%${BONUS_DIARIO[depois - 1] ? ` e um bônus de ${reais(BONUS_DIARIO[depois - 1])} por dia` : ""}`), 1800);
     }
   },
 
@@ -148,6 +167,7 @@ const Empregos = {
     const eu = jogo.posicaoJogador();
     if (emprego === "entregador") {
       const l = Lugares.porTipo.lanchonete;
+      if (!Lugares.aberto(l)) { this.espera = 3; return; }          // de madrugada a Lanchonete fecha
       this.tarefa = { etapa: "buscar", alvo: { x: l.frente.x, z: l.frente.z, nome: "Lanchonete" }, raio: 4.5,
                       texto: "📦 Busque o pedido na Lanchonete" };
       Hud.anunciar("📦 Novo pedido! Busque na Lanchonete");
@@ -197,7 +217,7 @@ const Empregos = {
       const motivo = t.etapa === "entregar" ? "entrega" : "corrida";
       Vida.ganhar(valor, noPrazo ? `${motivo} no prazo (com gorjeta!)` : `${motivo} atrasada`);
       Vida.estado.feitos[motivo] = (Vida.estado.feitos[motivo] || 0) + 1;
-      this.ganharXp(emprego, noPrazo ? 1 : 0.5);
+      this.ganharXp(emprego, (noPrazo ? 1 : 0.5) * (emprego === "taxista" ? 1.2 : 1));
       if (t.etapa === "levar") {
         this.passageiro.position.set(t.alvo.x, Casas.alturaChao(t.alvo.x, t.alvo.z), t.alvo.z);
         this.passageiro.visible = true;
@@ -271,6 +291,7 @@ const Empregos = {
       const resta = Math.ceil(t.prazo - t.tempo);
       return `${t.texto} · ${resta >= 0 ? resta + " s" : "atrasado!"}`;
     }
+    if (e === "entregador" && !Lugares.aberto(Lugares.porTipo.lanchonete)) return `🔒 A Lanchonete está fechada · abre às 6h (ou durma até de manhã)`;
     if (e === "entregador" || e === "taxista") return this.pausado ? "Expediente pausado · J volta ao trabalho" : "Aguardando o próximo chamado...";
     if (e === "pescador") return `🎣 Pesque e venda na Peixaria (${Inventario.quantidade("peixe")} peixes)`;
     return `🪓 Corte árvores e venda na Serraria (${Inventario.quantidade("madeira")} toras)`;

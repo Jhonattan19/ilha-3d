@@ -70,7 +70,7 @@ const CameraJogo = {
     const alvo = p.clone().addScaledVector(frente, -17);
     alvo.y += 5.5;
     c.position.lerp(alvo, imediato ? 1 : 1 - Math.exp(-4 * dt));
-    const chao = Math.max(Terreno.alturaTerreno(c.position.x, c.position.z), CONFIG.mundo.nivelAgua) + 1.5;
+    const chao = Math.max(Terreno.alturaTerreno(c.position.x, c.position.z), Terreno.nivelAgua(c.position.x, c.position.z)) + 1.5;
     if (c.position.y < chao) c.position.y = chao;
     Aeroclube.segurarCamera(c, p);
     this.olharPara.copy(p).addScaledVector(frente, 12);

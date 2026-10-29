@@ -7,8 +7,10 @@
 // andou ao longo da estrada. Com ele dá para achar a posição: é só
 // procurar entre quais pontos da estrada aquele "s" cai.
 //
-// Eles freiam para não bater no veículo da frente nem em você, buzinam
-// se você ficar parado no caminho e batem de verdade se você trombar.
+// Eles freiam para não bater no veículo da frente nem em você, param no
+// sinal vermelho (semaforos.js), buzinam se você ficar parado no caminho
+// e batem de verdade se você trombar (e aí a polícia pode vir!).
+// De madrugada (meia-noite às 5h) metade deles fica em casa.
 // =====================================================================
 
 const Trafego = {
@@ -38,7 +40,8 @@ const Trafego = {
         s: (k / tipos.length) * this.total + sorteio() * 20,
         sentido: k % 2 === 0 ? 1 : -1,
         velMax: tipo === "carro" ? 12 + sorteio() * 5 : 14 + sorteio() * 5,
-        vel: 0, parado: 0, buzinou: 0, inclinacao: 0
+        vel: 0, parado: 0, buzinou: 0, inclinacao: 0,
+        dorme: k % 2 === 1          // estes ficam em casa de madrugada
       });
     });
     cena.add(this.grupo);
@@ -111,7 +114,10 @@ const Trafego = {
     const meuP = eu.posicao;
     const t = performance.now() / 1000;
     // Ordena por sentido para achar quem está na frente
+    const madrugada = Ceu.hora < 5 || Ceu.hora >= 23.5;
     for (const v of this.lista) {
+      v.emCasa = madrugada && v.dorme;
+      if (v.emCasa) { v.grupo.visible = false; v.vel = 0; continue; }
       v.parado = Math.max(0, v.parado - dt);
       const p = this.pontoEm(v.s);
       const fx = p.fx * v.sentido, fz = p.fz * v.sentido;
@@ -119,7 +125,7 @@ const Trafego = {
       // Distância até o veículo da frente (mesmo sentido)
       let livre = 60;
       for (const o of this.lista) {
-        if (o === v || o.sentido !== v.sentido) continue;
+        if (o === v || o.sentido !== v.sentido || o.emCasa) continue;
         let d = (o.s - v.s) * v.sentido;
         d = ((d % this.total) + this.total) % this.total;
         if (d < livre) livre = d;
@@ -129,6 +135,15 @@ const Trafego = {
       const frente = dx * fx + dz * fz, lado = Math.abs(dx * fz - dz * fx);
       const voando = jogo.noAviao && !jogo.aviao.noChao;
       if (!voando && !jogo.noBarco && frente > 0 && frente < 30 && lado < 2.6) livre = Math.min(livre, frente);
+      // Sinal fechado na frente: para na faixa
+      const sinal = Semaforos.distanciaParada(v.s, v.sentido, this.total);
+      if (sinal !== null) livre = Math.min(livre, sinal + 6.5);
+      // Viatura da polícia atravessada na frente
+      for (const pol of Policia.viaturas) {
+        const px = pol.posicao.x - v.grupo.position.x, pz = pol.posicao.z - v.grupo.position.z;
+        const f = px * fx + pz * fz;
+        if (f > 0 && f < 25 && Math.abs(px * fz - pz * fx) < 3) livre = Math.min(livre, f);
+      }
 
       // Velocidade: anda até o máximo, freia conforme o espaço livre na frente
       const alvo = v.parado > 0 ? 0 : Math.min(v.velMax, Math.max(0, (livre - 7) * 1.3));
@@ -136,7 +151,7 @@ const Trafego = {
       v.s += v.vel * v.sentido * dt;
 
       // Buzina se você ficar parado na frente
-      if (livre < 10 && v.vel < 1 && v.parado <= 0) {
+      if (livre < 10 && v.vel < 1 && v.parado <= 0 && sinal === null) {
         v.buzinou += dt;
         if (v.buzinou > 2 && Math.hypot(dx, dz) < 60) { Som.bip(v.tipo === "carro" ? 380 : 620, 0.35, { tipo: "square", volume: 0.03 }); Som.bip(v.tipo === "carro" ? 380 : 620, 0.35, { tipo: "square", volume: 0.03, atraso: 0.45 }); v.buzinou = -1.5; }
       } else v.buzinou = 0;
@@ -172,6 +187,7 @@ const Trafego = {
           c.vx = dx / d * forca * 0.4; c.vz = dz / d * forca * 0.4;
           c.tremor = Math.min(1, forca / 20);
           if (Som.podeTocar("batidaTrafego", 600)) Som.batida();
+          if (forca > 9) Policia.crime(1, c.posicao, "batida no trânsito");
           v.parado = 3; v.vel = 0;
         }
       }

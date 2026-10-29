@@ -52,7 +52,8 @@ const Grama = {
       uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog]),
       vertexShader: `
         attribute vec4 aBase;
-        uniform float uTempo, uLado, uNeve;
+        uniform float uTempo, uLado, uNeve, uSeca, uFlores;
+        uniform vec3 uTinta;
         uniform vec3 uCentro;
         uniform sampler2D uAltura, uMascara;
         uniform vec4 uMundo;
@@ -95,6 +96,14 @@ const Grama = {
           // Cor: mais escura no alto do morro, umas folhas mais amareladas
           vec3 verde = mix(vec3(0.31, 0.60, 0.24), vec3(0.23, 0.48, 0.18), smoothstep(15.0, 45.0, y0));
           vCor = mix(verde, vec3(0.50, 0.56, 0.24), step(0.9, aBase.w) * 0.5);
+          // Estações: grama seca (outono/inverno), mais viva (primavera) e florzinhas no meio
+          vec3 seca = mix(vec3(0.62, 0.52, 0.27), vec3(0.52, 0.47, 0.30), fract(aBase.w * 37.0));
+          vCor = mix(vCor, seca, uSeca * (0.75 + fract(aBase.w * 13.0) * 0.25)) * uTinta;
+          if (aBase.w > 1.0 - uFlores * 0.07) {
+            float qual = fract(aBase.w * 211.0);
+            vec3 flor = qual < 0.33 ? vec3(0.98, 0.55, 0.78) : qual < 0.66 ? vec3(0.98, 0.86, 0.25) : vec3(0.97, 0.97, 0.97);
+            vCor = mix(vCor, flor * 1.15, smoothstep(0.55, 0.85, uv.y));
+          }
           vAltura = t;
           #include <fog_vertex>
         }`,
@@ -111,7 +120,7 @@ const Grama = {
         }`
     });
     Object.assign(material.uniforms, {
-      uTempo: u.tempo, uLado: { value: this.lado }, uNeve: Clima.uNeve, uCentro: this.uCentro,
+      uTempo: u.tempo, uLado: { value: this.lado }, uNeve: Clima.uNeve, uSeca: Estacoes.u.seca, uFlores: Estacoes.u.flores, uTinta: Estacoes.u.tinta, uCentro: this.uCentro,
       uAltura: u.altura, uMascara: u.mascaraGrama, uMundo: u.mundo, uLuzCor: u.luzCor, uAmbiente: u.ambiente
     });
 

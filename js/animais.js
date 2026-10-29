@@ -150,7 +150,7 @@ class Animal {
     this.empurrao.z *= Math.exp(-4 * dt);
 
     const nx = p.x + vx * dt, nz = p.z + vz * dt;
-    const h = Terreno.alturaTerreno(nx, nz);
+    const h = Terreno.alturaTerreno(nx, nz) - Math.max(0, Terreno.nivelAgua(nx, nz));   // (lagos e rios contam como água)
     const longeDeCasa = Math.hypot(nx - this.casa.x, nz - this.casa.z) > this.def.passeio * 2;
     const bloqueado = h < (this.def.aguaMinima ?? 0.3) || Casas.ocupado(nx, nz, 0.2) || (longeDeCasa && this.estado !== "atacando");
     if (bloqueado) {

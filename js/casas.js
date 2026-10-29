@@ -65,6 +65,7 @@ const Casas = {
       if (this.lista.some(c => Math.hypot(c.x - x, c.z - z) < 28)) continue;
       if (Terreno.estradaMaisProxima(x, z).distancia < 15) continue;
       if (Terreno.naPista(x, z, 25)) continue;           // nada de casa na pista de pouso
+      if (AguaDoce.perto(x, z, 16)) continue;           // nem na beira de lago ou rio
       const casa = this.avaliarTerreno(x, z, rotacao);
       if (!casa) continue;
 
@@ -497,8 +498,8 @@ const Casas = {
   },
 
   // Altura do chão para quem anda a pé (terreno, piso da casa ou degrau)
-  alturaChao(x, z) {
-    let h = Math.max(Terreno.altura(x, z), Pier.altura(x, z)); // o píer também é chão
+  alturaChao(x, z, y = Infinity) {
+    let h = Math.max(Terreno.altura(x, z, y), Pier.altura(x, z)); // o píer (e a ponte) também são chão
     for (const c of this.proximas(x, z)) {
       const l = c.paraLocal(x, z);
       for (const p of c.pisos) {

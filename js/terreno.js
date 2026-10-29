@@ -33,6 +33,7 @@ const Terreno = {
     this.estradas = [{ pontos: this.estrada, fechada: true }];
     this.gerarTransversais();
     this.pista = this.escolherPista();   // pista de pouso (o chão embaixo dela é aplainado)
+    AguaDoce.planejar(this, semente);    // lagos e rios (cavados no relevo logo abaixo)
     this.calcularAlturas();
     this.escolherRampas();
 
@@ -44,6 +45,7 @@ const Terreno = {
     this.grupo.add(this.criarPraca());
     if (this.pista) this.grupo.add(this.criarMalhaPista());
     this.grupo.add(this.criarAgua());
+    AguaDoce.criarMalhas(this.grupo);
     for (const r of this.rampas) this.grupo.add(this.criarMalhaRampa(r));
     cena.add(this.grupo);
   },
@@ -302,6 +304,9 @@ const Terreno = {
           if (pesoHangar > 0) h = Util.lerp(h, P.y - 0.02, pesoHangar);
         }
 
+        // Lagos e rios: rebaixa o fundo e as margens (menos embaixo das estradas: lá fica a ponte)
+        h = AguaDoce.cavar(x, z, h, e.distancia, j * this.lado + i);
+
         this.alturas[j * this.lado + i] = h;
         this.distEstrada[j * this.lado + i] = e.distancia;
       }
@@ -420,9 +425,29 @@ const Terreno = {
     return Util.lerp(Util.lerp(a, b, fx), Util.lerp(c, d, fx), fz);
   },
 
+  // Nível da água aqui: de um lago ou rio, ou o do mar
+  nivelAgua(x, z) {
+    const doce = AguaDoce.nivel(x, z);
+    if (doce !== null && doce > this.alturaTerreno(x, z) - 0.5) return doce;
+    return this.agua ? this.agua.position.y : CONFIG.mundo.nivelAgua;
+  },
+
+  // Quanto de água tem em cima do chão (negativo = chão seco acima da água)
+  profundidade(x, z) {
+    return this.nivelAgua(x, z) - this.alturaTerreno(x, z);
+  },
+
+  // Chão seco, com pelo menos "folga" metros acima da água
+  emTerra(x, z, folga = 0) {
+    return -this.profundidade(x, z) > folga;
+  },
+
   // Altura considerando as rampas (é essa que o carro usa)
-  altura(x, z) {
+  // "y" (opcional) = altura de quem pergunta: quem está lá embaixo, no rio, passa por baixo da ponte
+  altura(x, z, y = Infinity) {
     let h = this.alturaTerreno(x, z);
+    const ponte = AguaDoce.alturaPonte(x, z);          // em cima de uma ponte, o chão é o tabuleiro
+    if (ponte !== null && ponte > h && y > ponte - 1.3) h = ponte;
     for (const r of this.rampas) {
       const rx = x - r.x, rz = z - r.z;
       const u = rx * r.dx + rz * r.dz;          // quanto já subiu na rampa
@@ -510,6 +535,8 @@ const Terreno = {
     Graficos.aplicarCausticas(material);       // luzes dançando no fundo do mar
     const malha = new THREE.Mesh(geo, material);
     malha.receiveShadow = true;
+    this.malhaTerreno = malha;
+    this.coresBase = cores.slice();   // cores "de verão" (as estações pintam a grama por cima)
     return malha;
   },
 
@@ -532,7 +559,7 @@ const Terreno = {
       const px = -p.dz, pz = p.dx; // perpendicular
       for (const c of colunas) {
         const x = p.x + px * c * meia, z = p.z + pz * c * meia;
-        posicoes.push(x, this.alturaTerreno(x, z) + 0.12, z);
+        posicoes.push(x, this.altura(x, z) + 0.12, z);   // (na ponte, o asfalto fica em cima do tabuleiro)
         uvs.push((c + 1) / 2, distancia / 14);
       }
     }

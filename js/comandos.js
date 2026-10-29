@@ -6,7 +6,10 @@
 //   /tempo 14  ou  /tempo 14:30       → hora exata
 //   /tempo parar | continuar          → congela o ciclo do dia
 //   /clima sol | chuva | neve
+//   /estacao primavera | verao | outono | inverno | halloween | natal | auto | ciclo
 //   /dar <item> [quantidade]           → ex.: /dar facão, /dar pedras 10
+//   /policia 0 a 5                     → estrelas de procurado (0 = a polícia esquece)
+//   /gasolina 0 a 100                  → enche (ou esvazia) o tanque (Nova Vida)
 //   /ajuda
 // Também aceita em inglês: /time set day, /weather rain, /give ...
 // =====================================================================
@@ -93,6 +96,26 @@ const Comandos = {
       case "aviao": case "plane":
         Historias.liberarAviao();
         return this.mensagem("✈️ Avião liberado no hangar do Aeroclube (atalho de teste)");
+      case "policia": case "procurado": case "wanted": case "estrelas": {
+        const n = Number(args[0]);
+        if (!(n >= 0 && n <= 5)) return this.mensagem("Use: /policia 0 a 5 (estrelas de procurado)", true);
+        if (n === 0) { Policia.despistou(); return this.mensagem("👮 A polícia esqueceu de você"); }
+        Policia.pontos = 0; Policia.estrelas = 0;
+        Policia.crime(PONTOS_ESTRELA[n - 1], Jogo.posicaoJogador(), "comando /policia");
+        return this.mensagem(`🚨 Procurado: ${"★".repeat(n)}`);
+      }
+      case "gasolina": case "fuel": {
+        if (!Vida.ativo) return this.mensagem("No modo livre não precisa de gasolina 😉", true);
+        if (!TANQUES[Jogo.carro.tipo]) return this.mensagem("Esse veículo não usa gasolina", true);
+        const n = args[0] === undefined ? 100 : Number(args[0]);
+        if (!(n >= 0 && n <= 100)) return this.mensagem("Use: /gasolina 0 a 100", true);
+        Gasolina.definir(Jogo.carro.tipo, n);
+        return this.mensagem(`⛽ Tanque com ${n}%`);
+      }
+      case "estacao": case "season": case "estacoes":
+        return this.comandoEstacao(args[0]);
+      case "primavera": case "verao": case "outono": case "inverno": case "halloween": case "natal":
+        return this.comandoEstacao(comando);         // atalho: /natal
       case "graficos": case "grafico": case "graphics":
         return this.comandoGraficos(args[0]);
       case "ajuda": case "help": case "?":
@@ -115,6 +138,15 @@ const Comandos = {
 
     Ceu.hora = hora;
     this.mensagem(`🕒 Hora definida: ${Ceu.textoHora()}`);
+  },
+
+  comandoEstacao(valor) {
+    const nomes = { spring: "primavera", summer: "verao", autumn: "outono", fall: "outono", winter: "inverno", christmas: "natal", xmas: "natal",
+                    automatica: "auto", automatico: "auto", ciclo: "ciclo", cycle: "ciclo" };
+    const modo = nomes[valor] || valor;
+    if (!MODOS_ESTACAO.includes(modo)) return this.mensagem("Use: /estacao primavera, verao, outono, inverno, halloween, natal, auto ou ciclo", true);
+    Estacoes.definirModo(modo);
+    this.mensagem(`${Estacoes.icone()} Estação: ${Estacoes.textoModo()}`);
   },
 
   comandoClima(valor) {
@@ -148,8 +180,11 @@ const Comandos = {
     [
       "/tempo manhã | tarde | noite | 14:30 | parar | continuar",
       "/clima sol | chuva | neve",
+      "/estacao primavera | verao | outono | inverno | halloween | natal | auto | ciclo",
       "/dar <item> [quantidade]   (ex.: /dar pedras 10)",
       "/graficos bonito | leve",
+      "/policia 0 a 5   (estrelas de procurado)",
+      "/gasolina 0 a 100   (só no modo Nova Vida)",
       "/aviao   (libera o avião sem fazer as missões)",
       "/dinheiro 1000   (só no modo Nova Vida)",
       "Também vale em inglês: /time set day, /weather rain, /give"

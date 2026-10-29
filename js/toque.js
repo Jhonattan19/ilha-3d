@@ -71,6 +71,7 @@ const Toque = {
         <button data-tecla="KeyC" class="bt pequeno">📷</button>
         <button data-tecla="KeyR" class="bt pequeno">🛟</button>
         <button data-tecla="KeyJ" class="bt pequeno so-vida-toque">💼</button>
+        <button data-tecla="KeyN" class="bt pequeno so-vida-toque">📜</button>
         <button data-tecla="KeyM" class="bt pequeno">🔈</button>
       </div>`;
     document.getElementById("hud").appendChild(area);
@@ -203,7 +204,8 @@ const Toque = {
                             jogo.noBarco ? ["—", "turbo"] : ["freio", jogo.carro.def.nitro ? "nitro" : "—"];
     this.trocarTexto("rotuloEspaco", espaco);
     this.trocarTexto("rotuloShift", shift);
-    this.trocarTexto("rotuloE", jogo.noAviao || jogo.noBarco || !jogo.aPe ? "sair" : "ação");
+    const posto = !jogo.aPe && !jogo.noBarco && !jogo.noAviao && Gasolina.temTanque(jogo.carro) && Atracoes.noPosto(jogo.carro);
+    this.trocarTexto("rotuloE", posto ? "posto" : jogo.noAviao || jogo.noBarco || !jogo.aPe ? "sair" : "ação");
     document.body.classList.toggle("dirigindo", !jogo.aPe);
     document.body.classList.toggle("vida-toque", Vida.ativo);
   },

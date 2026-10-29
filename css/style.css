@@ -45,6 +45,18 @@ html, body {
 .velocimetro { right: 16px; bottom: 16px; min-width: 190px; text-align: right; }
 .velocimetro #hudVelocidade { font-size: 46px; font-weight: 800; font-style: italic; font-variant-numeric: tabular-nums; }
 .velocimetro small { color: #94a3b8; }
+.linha-gasolina { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13px; }
+.linha-gasolina .barra { flex: 1; margin: 0; }
+#barraGasolina { background: linear-gradient(90deg, #ef4444, #facc15 30%, #22c55e); }
+.linha-gasolina.reserva #barraGasolina { background: #ef4444; animation: piscarEstrela 0.6s steps(2) infinite; }
+
+/* Estrelas de procurado: piscam quando a polícia perdeu você de vista */
+.estrelas { top: 16px; right: 224px; text-align: center; padding: 6px 12px; }
+#estrelasTexto { font-size: 26px; letter-spacing: 2px; color: #facc15; text-shadow: 0 0 8px rgba(250, 204, 21, 0.6); line-height: 1; }
+#estrelasTexto .apagada { color: rgba(255, 255, 255, 0.25); text-shadow: none; }
+.estrelas small { display: block; font-size: 11px; color: #cbd5e1; margin-top: 3px; }
+.estrelas.procurando #estrelasTexto { animation: piscarEstrela 0.5s steps(2) infinite; }
+@keyframes piscarEstrela { 50% { opacity: 0.25; } }
 .barra { height: 8px; background: rgba(255, 255, 255, 0.12); border-radius: 4px; overflow: hidden; margin: 6px 0 4px; }
 .barra .preenchido { height: 100%; width: 100%; background: linear-gradient(90deg, #38bdf8, #a78bfa); }
 
@@ -331,6 +343,10 @@ body.celular .mapa .hora { font-size: 11px; margin-top: 3px; }
 body.celular .velocimetro { top: 8px; bottom: auto; right: calc(128px + env(safe-area-inset-right)); min-width: 96px; }
 body.celular .velocimetro #hudVelocidade { font-size: 24px; }
 body.celular .velocimetro .rotulo { font-size: 8px; }
+body.celular .linha-gasolina { font-size: 10px; margin-top: 2px; }
+body.celular .estrelas { top: 122px; left: calc(8px + env(safe-area-inset-left)); right: auto; padding: 3px 8px; }
+body.celular #estrelasTexto { font-size: 16px; }
+body.celular .estrelas small { font-size: 9px; }
 body.celular .controles { display: none; }
 body.celular .inventario { bottom: 6px; gap: 4px; }
 body.celular .slot { width: 38px; height: 38px; font-size: 19px; pointer-events: auto; }

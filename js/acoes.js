@@ -56,7 +56,7 @@ const Status = {
 
 // Força e alcance de cada tipo de golpe (forca 6 ou mais derruba um morador)
 const GOLPES = {
-  soco:    { alcance: 1.5, forca: 4,  espera: 0.35 },
+  soco:    { alcance: 1.5, forca: 4,  espera: 0.28, maos: true },   // alterna: direita, esquerda, direita...
   vara:    { alcance: 2.8, forca: 5,  espera: 0.5 },
   facao:   { alcance: 2.4, forca: 8,  espera: 0.4, corte: true },
   machado: { alcance: 2.6, forca: 11, espera: 0.6, corte: true }
@@ -105,6 +105,7 @@ const Acoes = {
     if (!slot) {
       if (!jogo.aPe) return Hud.anunciar("Mão vazia. Escolha um item com as teclas 1 a 6");
       if (jogo.pessoa.nadando) return;
+      if (Atracoes.bolaNaFrente(jogo.pessoa)) return Atracoes.chutar(jogo.pessoa);   // bola na frente: chuta!
       return this.atacar(jogo.pessoa, GOLPES.soco);
     }
     const def = ITENS[slot.tipo];
@@ -141,24 +142,27 @@ const Acoes = {
     if (def.tipo === "remedio") Som.curar(); else Som.comer();
   },
 
-  // Machado: 4 golpes derrubam a árvore e dão 2 ou 3 toras
+  // Machado: de 5 a 7 golpes derrubam a árvore e dão 2 ou 3 toras
   cortar(pessoa) {
-    if (performance.now() - (this.ultimoCorte || 0) < 450) return;
+    if (performance.now() - (this.ultimoCorte || 0) < 550) return;
     this.ultimoCorte = performance.now();
     pessoa.golpear();
     Som.facao();
     const arvore = Natureza.arvoreAFrente(pessoa.posicao.x, pessoa.posicao.z, pessoa.direcao);
     if (!arvore) return Hud.anunciar("Chegue de frente para uma árvore");
+    if (Inventario.quantidade("madeira") >= LIMITE_CARGA.madeira) return Hud.anunciar(`Você não aguenta carregar mais de ${LIMITE_CARGA.madeira} toras! Venda na Serraria 🪵`);
     Som.acertou();
     arvore.golpes++;
     for (let i = 0; i < 5; i++) {
       Particulas.emitir(arvore.x, pessoa.posicao.y + 1, arvore.z, { vx: (Math.random() - 0.5) * 3, vy: 2 + Math.random() * 2, vz: (Math.random() - 0.5) * 3,
         cor: "#d6a35c", tamanho: 0.15, vida: 0.6, gravidade: 9, alfa: 1, crescer: 0 });
     }
-    if (arvore.golpes < 4) return Hud.anunciar(`🪓 ${"▮".repeat(arvore.golpes)}${"▯".repeat(4 - arvore.golpes)}`);
+    // Árvore grande precisa de mais machadadas (de 5 a 7)
+    const golpesPrecisos = Math.min(7, 5 + Math.round(arvore.escala));
+    if (arvore.golpes < golpesPrecisos) return Hud.anunciar(`🪓 ${"▮".repeat(arvore.golpes)}${"▯".repeat(golpesPrecisos - arvore.golpes)}`);
     Natureza.derrubar(arvore);
     Som.aterrissar(12);
-    const toras = 2 + Math.round(arvore.escala);
+    const toras = Math.min(2 + Math.round(arvore.escala), LIMITE_CARGA.madeira - Inventario.quantidade("madeira"));
     const ok = Inventario.adicionar("madeira", toras);
     Hud.anunciar(ok ? `🌲 Árvore no chão! +${toras} toras de madeira` : "Inventário cheio! Venda as toras ou largue algo");
     if (ok) Som.pegar();
@@ -168,11 +172,20 @@ const Acoes = {
   atacar(pessoa, golpe) {
     if (performance.now() - (this.ultimoGolpe || 0) < golpe.espera * 1000) return;
     this.ultimoGolpe = performance.now();
-    pessoa.golpear();
-    if (golpe.corte) Som.facao(); else Som.ruido(0.08, 0.04, 500);
-    const acertos = Animais.golpear(pessoa.posicao, pessoa.direcao, golpe.alcance, golpe.forca) +
-                    Moradores.golpear(pessoa.posicao, pessoa.direcao, golpe.alcance, golpe.forca);
+    let origem = pessoa.posicao;
+    if (golpe.maos) {
+      // Um soco com cada mão; o soco sai um pouco do lado da mão que bateu
+      this.mao = this.mao === 0 ? 1 : 0;
+      pessoa.golpear(this.mao);
+      const lado = this.mao === 0 ? -1 : 1, d = pessoa.direcao;
+      origem = { x: pessoa.posicao.x + Math.cos(d) * lado * 0.25, y: pessoa.posicao.y, z: pessoa.posicao.z - Math.sin(d) * lado * 0.25 };
+    } else pessoa.golpear();
+    if (golpe.corte) Som.facao(); else Som.ruido(0.08, 0.04, this.mao ? 420 : 560);
+    const moradores = Moradores.golpear(origem, pessoa.direcao, golpe.alcance, golpe.forca);
+    const acertos = Animais.golpear(origem, pessoa.direcao, golpe.alcance, golpe.forca) + moradores;
     if (acertos) Som.acertou();
+    // Bater em morador é crime: a polícia vem (golpe forte conta mais)
+    if (moradores) Policia.crime(golpe.forca >= 6 ? 2 : 1, pessoa.posicao, golpe.forca >= 6 ? "agressão" : "briga");
   },
 
   // Tem bicho ou morador ao alcance, na frente? (para o machado e a vara decidirem: golpe ou trabalho)
@@ -243,7 +256,7 @@ const Acoes = {
     let alvo = null;
     for (let d = 4; d <= 22 && !alvo; d += 1) {
       const x = pessoa.posicao.x + f.x * d, z = pessoa.posicao.z + f.z * d;
-      if (Terreno.alturaTerreno(x, z) < -0.6) alvo = { x, z };
+      if (Terreno.profundidade(x, z) > 0.6) alvo = { x, z, nivel: Terreno.nivelAgua(x, z) };   // mar, lago ou rio
     }
     if (!alvo) return Hud.anunciar("Fique de frente para a água, bem na beira, para pescar 🎣");
 
@@ -254,7 +267,7 @@ const Acoes = {
       timer: cardume ? 1.5 + Math.random() * 2.5 : Jogo.noBarco ? 3 + Math.random() * 4 : 4 + Math.random() * 6,
       origem: pessoa.posicao.clone()
     };
-    this.boia.position.set(alvo.x, 0, alvo.z);
+    this.boia.position.set(alvo.x, alvo.nivel, alvo.z);
     this.boia.visible = true;
     this.linha.visible = true;
     pessoa.golpear();
@@ -263,8 +276,10 @@ const Acoes = {
   },
 
   puxarPeixe() {
-    const resultado = Inventario.adicionar("peixe", 1);
-    if (!resultado) Hud.anunciar("Inventário cheio! O peixe voltou para a água");
+    const cheio = Inventario.quantidade("peixe") >= LIMITE_CARGA.peixe;
+    const resultado = !cheio && Inventario.adicionar("peixe", 1);
+    if (cheio) Hud.anunciar(`O cesto está cheio (${LIMITE_CARGA.peixe} peixes)! Venda na Peixaria ou coma alguns`);
+    else if (!resultado) Hud.anunciar("Inventário cheio! O peixe voltou para a água");
     else { Hud.anunciar("🐟 Você pescou um peixe! (+35 fome quando comer)"); Som.pegar(); }
     for (let i = 0; i < 16; i++) Particulas.emitir(this.pesca.x, 0.1, this.pesca.z, { vx: (Math.random() - 0.5) * 3, vy: 2 + Math.random() * 3, vz: (Math.random() - 0.5) * 3, cor: "#e0f2fe", tamanho: 0.3, vida: 0.7, gravidade: 10, alfa: 0.9 });
     this.cancelarPesca();
@@ -339,7 +354,7 @@ const Acoes = {
           pesca.timer = 2 + Math.random() * 4;
         }
       }
-      this.boia.position.y = Terreno.agua.position.y + Math.sin(t * 2.5) * 0.04 - afundar;
+      this.boia.position.y = pesca.nivel + Math.sin(t * 2.5) * 0.04 - afundar;
 
       // Linha: da ponta da vara até a boia
       const f = { x: Math.sin(pessoa.direcao), z: Math.cos(pessoa.direcao) };

@@ -138,7 +138,11 @@ const Ceu = {
 
   // Devolve o quanto é "dia" (0 = noite, 1 = dia)
   atualizar(dt, centro, camera) {
-    if (!this.parado) this.hora = (this.hora + dt * 24 / CONFIG.dia.duracaoSegundos) % 24;
+    // Cada parte do dia anda numa velocidade: 6 horas do jogo em "minutos" minutos de verdade
+    if (!this.parado) {
+      const p = CONFIG.dia.periodos.find(q => this.hora >= q.de && this.hora < q.ate) || { de: 0, ate: 24, minutos: CONFIG.dia.duracaoSegundos / 60 };
+      this.hora = (this.hora + dt * (p.ate - p.de) / (p.minutos * 60)) % 24;
+    }
 
     // O sol nasce às 6h no leste, fica no alto às 12h e se põe às 18h
     const angulo = ((this.hora - 6) / 24) * Math.PI * 2;

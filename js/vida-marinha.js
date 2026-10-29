@@ -270,8 +270,8 @@ const VidaMarinha = {
   // Chamado depois do céu: se a câmera está dentro do mar, troca a neblina
   // por um azul-esverdeado perto, esconde o céu e liga o tom do pós-processamento.
   atualizarVisao(camera, cena) {
-    const superficie = Terreno.agua ? Terreno.agua.position.y : 0;
-    const submerso = camera.position.y < superficie - 0.05;
+    const superficie = Terreno.nivelAgua(camera.position.x, camera.position.z);   // no mar e nos lagos
+    const submerso = camera.position.y < superficie - 0.05 && Terreno.alturaTerreno(camera.position.x, camera.position.z) < superficie;
     Graficos.u.submerso.value = submerso ? 1 : 0;
     Ceu.cupula.visible = !submerso;
     if (!submerso) return;

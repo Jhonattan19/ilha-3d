@@ -7,10 +7,11 @@ const Hud = {
   mapaBase: null,
 
   iniciar() {
-    for (const id of ["hud", "hudMoedas", "hudSalto", "hudCorrida", "hudTempo", "hudAnel", "hudRecorde", "hudDica",
+    for (const id of ["hud", "hudMoedas", "hudSalto",
                       "hudHora", "hudVelocidade", "barraNitro", "bussola", "setaBussola", "anuncio", "minimapa",
                       "rotuloNitro", "hudComodo", "hudAcao", "barraVida", "barraFome", "inventario", "nomeItem",
-                      "flashDano", "painelControles", "hudDinheiro", "hudEmprego", "hudDia", "hudTarefa", "distanciaBussola", "linhaFolego", "barraFolego", "hudMissao"]) {
+                      "flashDano", "painelControles", "hudDinheiro", "hudEmprego", "hudDia", "hudTarefa", "distanciaBussola", "linhaFolego", "barraFolego", "hudMissao",
+                      "linhaGasolina", "barraGasolina", "hudEstrelas", "estrelasTexto", "estrelasDica"]) {
       this.el[id] = document.getElementById(id);
     }
     this.ctxMapa = this.el.minimapa.getContext("2d");
@@ -74,7 +75,9 @@ const Hud = {
         const x = -CONFIG.mundo.tamanho / 2 + i * escala, z = -CONFIG.mundo.tamanho / 2 + j * escala;
         const h = Terreno.alturaTerreno(x, z);
         let cor;
-        if (h < 0) cor = [29, 90 + h, 140 + h * 2];
+        const doce = AguaDoce.nivel(x, z);
+        if (doce !== null && h < doce) cor = [52, 140, 175];          // lagos e rios
+        else if (h < 0) cor = [29, 90 + h, 140 + h * 2];
         else if (h < 2) cor = [225, 210, 160];
         else if (h > 52) cor = [235, 235, 240];
         else { const s = Math.min(1, h / 50); cor = [70 - s * 20, 150 - s * 50, 60 - s * 15]; }
@@ -131,6 +134,7 @@ const Hud = {
       g.fillRect(hx - 3, hy - 3, 6, 6);
       g.strokeRect(hx - 3, hy - 3, 6, 6);
     }
+    Atracoes.desenharNoMapa(g, (x, z) => this.paraMapa(x, z));
     this.mapaBase = c;
   },
 
@@ -156,6 +160,25 @@ const Hud = {
     if (acao) e.hudAcao.innerHTML = `<kbd>E</kbd>${acao}`;
     e.barraNitro.style.width = modo === "aviao" ? `${alvo.acelerador * 100}%` : aPe || (modo === "carro" && !def.nitro) ? "0%" : `${(alvo.nitro / CONFIG.carro.nitro.duracao) * 100}%`;
 
+    // Gasolina (Nova Vida, veículos a motor)
+    const mostraGasolina = Gasolina.temTanque(carro) && (modo === "carro" || (aPe && Jogo.temVeiculo));
+    e.linhaGasolina.classList.toggle("escondido", !mostraGasolina);
+    if (mostraGasolina) {
+      const g = Gasolina.nivel(carro.tipo);
+      e.barraGasolina.style.width = `${g}%`;
+      e.linhaGasolina.classList.toggle("reserva", g < 15);
+    }
+
+    // Estrelas de procurado
+    e.hudEstrelas.classList.toggle("escondido", Policia.estrelas === 0);
+    if (Policia.estrelas > 0) {
+      const html = "★".repeat(Policia.estrelas) + `<span class="apagada">${"★".repeat(5 - Policia.estrelas)}</span>`;
+      if (e.estrelasTexto.innerHTML !== html) e.estrelasTexto.innerHTML = html;
+      e.hudEstrelas.classList.toggle("procurando", !Policia.visto);
+      const dica = Policia.visto ? "a polícia está te vendo!" : Policia.esconderijo ? `🫣 escondido ${Policia.esconderijo}` : `procurando você... ${Math.ceil(Policia.tempoBusca - Policia.perdido)} s`;
+      if (e.estrelasDica.textContent !== dica) e.estrelasDica.textContent = dica;
+    }
+
     // Missão e evento em andamento
     const textoMissao = Historias.textoHud();
     e.hudMissao.classList.toggle("escondido", !textoMissao);
@@ -166,35 +189,21 @@ const Hud = {
     if (Vida.ativo) {
       const v = Vida.estado;
       e.hudDinheiro.textContent = reais(v.dinheiro);
-      e.hudEmprego.textContent = v.emprego ? `${EMPREGOS[v.emprego].icone} ${EMPREGOS[v.emprego].nome} · nv ${Empregos.nivel(v.emprego)}` : "Desempregado";
+      e.hudEmprego.textContent = v.emprego ? `${EMPREGOS[v.emprego].icone} ${EMPREGOS[v.emprego].nome} · ${Empregos.nomeNivel(v.emprego)}` : "Desempregado";
       e.hudDia.textContent = v.dia;
       e.hudTarefa.textContent = Vida.destaque && !Empregos.tarefa ? `➜ Vá até: ${Vida.destaque.nome}` : Empregos.textoTarefa();
     }
     e.hudMoedas.textContent = `${Missoes.coletadas}/${Missoes.moedas.length}`;
     e.hudSalto.textContent = `${Missoes.maiorSalto.toFixed(1)} s`;
-    e.hudHora.textContent = Ceu.textoHora();
-    e.hudRecorde.textContent = Util.formatarTempo(Missoes.lerRecorde());
+    e.hudHora.textContent = `${Ceu.textoHora()} ${Estacoes.icone()}`;
 
-    e.hudCorrida.classList.toggle("escondido", !Missoes.emCorrida);
-    e.hudDica.classList.toggle("escondido", Missoes.emCorrida);
-    // Bússola: na corrida aponta o anel; na Nova Vida, o destino do trabalho
-    const destino = Missoes.emCorrida ? null : Historias.alvoPrincipal() || (Vida.ativo ? Empregos.alvoAtual() : null);
-    e.bussola.classList.toggle("escondido", !Missoes.emCorrida && !destino);
+    // Bússola: na Nova Vida e nas missões aponta o destino
+    const destino = Historias.alvoPrincipal() || (Vida.ativo ? Empregos.alvoAtual() : null);
+    e.bussola.classList.toggle("escondido", !destino);
     e.distanciaBussola.textContent = destino ? `${Math.round(Math.hypot(destino.x - alvo.posicao.x, destino.z - alvo.posicao.z))} m` : "";
     if (destino) {
       const anguloAlvo = Math.atan2(destino.x - alvo.posicao.x, destino.z - alvo.posicao.z);
       e.setaBussola.style.transform = `rotate(${Util.diferencaAngulo(alvo.direcao, anguloAlvo)}rad)`;
-    }
-    if (Missoes.emCorrida) {
-      e.hudTempo.textContent = Util.formatarTempo(Missoes.tempoCorrida);
-      const total = Missoes.aneis.length;
-      e.hudAnel.textContent = Missoes.proximoAnel < total ? `${Missoes.proximoAnel + 1}/${total}` : "PORTAL!";
-
-      // Bússola: aponta para o próximo anel (ou para o portal no final)
-      const alvo = Missoes.aneis[Missoes.proximoAnel] || Missoes.portal;
-      const anguloAlvo = Math.atan2(alvo.x - carro.posicao.x, alvo.z - carro.posicao.z);
-      const relativo = Util.diferencaAngulo(carro.direcao, anguloAlvo);
-      e.setaBussola.style.transform = `rotate(${relativo}rad)`;
     }
 
     this.desenharMinimapa(alvo, modo !== "carro" && Jogo.temVeiculo ? carro : null, modo !== "barco" ? Jogo.barco : null);
@@ -212,18 +221,6 @@ const Hud = {
       if (m.coletada) continue;
       const [x, y] = this.paraMapa(m.x, m.z);
       g.fillRect(x - 1.5, y - 1.5, 3, 3);
-    }
-
-    // Portal e próximo anel
-    const [px, py] = this.paraMapa(Missoes.portal.x, Missoes.portal.z);
-    g.fillStyle = "#ef4444";
-    g.fillRect(px - 3, py - 3, 6, 6);
-    if (Missoes.emCorrida && Missoes.aneis[Missoes.proximoAnel]) {
-      const a = Missoes.aneis[Missoes.proximoAnel];
-      const [ax, ay] = this.paraMapa(a.x, a.z);
-      g.strokeStyle = "#22d3ee";
-      g.lineWidth = 2;
-      g.beginPath(); g.arc(ax, ay, 5, 0, Math.PI * 2); g.stroke();
     }
 
     // Nova Vida: quiosques, sua casa e o destino do trabalho
@@ -271,8 +268,22 @@ const Hud = {
     // Carros e motos dos moradores (pontinhos cinza)
     g.fillStyle = "#cbd5e1";
     for (const v of Trafego.lista) {
+      if (v.emCasa) continue;
       const [vx, vy] = this.paraMapa(v.grupo.position.x, v.grupo.position.z);
       g.fillRect(vx - 1.5, vy - 1.5, 3, 3);
+    }
+
+    // Polícia: viaturas piscando vermelho/azul e a área onde estão te procurando
+    if (Policia.estrelas > 0 && !Policia.visto && Policia.ultimaVista) {
+      const [ux, uy] = this.paraMapa(Policia.ultimaVista.x, Policia.ultimaVista.z);
+      g.fillStyle = "rgba(59,130,246,0.18)"; g.strokeStyle = "rgba(96,165,250,0.6)"; g.lineWidth = 1;
+      g.beginPath(); g.arc(ux, uy, 45 / CONFIG.mundo.tamanho * t, 0, Math.PI * 2); g.fill(); g.stroke();
+    }
+    const piscaPolicia = Math.floor(performance.now() / 250) % 2 === 0;
+    for (const v of Policia.viaturas) {
+      const [vx, vy] = this.paraMapa(v.posicao.x, v.posicao.z);
+      g.fillStyle = piscaPolicia ? "#ef4444" : "#3b82f6"; g.strokeStyle = "#fff"; g.lineWidth = 1;
+      g.beginPath(); g.arc(vx, vy, 3.2, 0, Math.PI * 2); g.fill(); g.stroke();
     }
 
     // Carro estacionado (quando você está a pé)
