@@ -59,13 +59,33 @@ const GOLPES = {
   soco:    { alcance: 1.5, forca: 4,  espera: 0.28, maos: true },   // alterna: direita, esquerda, direita...
   vara:    { alcance: 2.8, forca: 5,  espera: 0.5 },
   facao:   { alcance: 2.4, forca: 8,  espera: 0.4, corte: true },
-  machado: { alcance: 2.6, forca: 11, espera: 0.6, corte: true }
+  machado: { alcance: 2.6, forca: 11, espera: 0.6, corte: true },
+  // Armas que dá para achar pela ilha (forca 6 ou mais derruba; ninguém se machuca de verdade)
+  taco:        { alcance: 2.3, forca: 7, espera: 0.55 },
+  peDeCabra:   { alcance: 2.1, forca: 7, espera: 0.5 },
+  frigideira:  { alcance: 1.9, forca: 6, espera: 0.45, toim: true },
+  remo:        { alcance: 2.8, forca: 6, espera: 0.6 },
+  guardaChuva: { alcance: 2.0, forca: 3, espera: 0.45 }
+};
+const TANQUE_AGUA = 20;      // tiros da pistola d'água com o tanque cheio
+
+// O que os moradores dizem quando levam cada coisa
+const FRASES_ARMA = {
+  flecha: ["Ai! Uma flecha?!", "Tá achando que é Robin Hood?!", "Quase acertou meu chapéu!"],
+  tinta: ["Ei! Minha roupa nova!", "Tinta?! Sério?!", "Agora tô parecendo um arco-íris!", "Isso não sai na lavagem!"],
+  agua: ["Ei! Me molhou todo! 💦", "Que água gelada!", "Para, para! Hahaha", "Molhou meu celular!"],
+  choque: ["Bzzzt! Tô vendo estrelinhas...", "Ai! Que choque!", "Minhas pernas não obedecem!"],
+  bumerangue: ["Ai! Um bumerangue?!", "Isso voltou do nada!"]
 };
 
 const Acoes = {
   pedras: [],
   sinal: null,
   pesca: null,
+  projeteis: [],       // flechas, tinta, jato d'água, bumerangue e arpão
+  manchas: [],         // manchas de tinta no chão
+  tontos: [],          // moradores tontos por causa do choque
+  tanqueAgua: TANQUE_AGUA,
 
   iniciar(cena) {
     this.cena = cena;
@@ -92,6 +112,11 @@ const Acoes = {
   limpar() {
     for (const p of this.pedras) this.cena.remove(p.malha);
     this.pedras = [];
+    for (const p of this.projeteis) if (p.malha) this.cena.remove(p.malha);
+    for (const m of this.manchas) { this.cena.remove(m.malha); m.malha.material.dispose(); }
+    this.projeteis = []; this.manchas = []; this.tontos = [];
+    this.tanqueAgua = TANQUE_AGUA;
+    if (this.raio) this.raio.visible = false;
     this.sinal = null;
     this.luzSinal.intensity = 0;
     this.bolaSinal.visible = false;
@@ -111,6 +136,7 @@ const Acoes = {
     const def = ITENS[slot.tipo];
 
     if (def.tipo === "comida" || def.tipo === "remedio") return this.consumir(slot.tipo, def);
+    if (slot.tipo === "arpao") return jogo.aPe ? this.dispararArpao(jogo.pessoa) : Hud.anunciar("Desça e mergulhe para usar o arpão 🤿");
     if (jogo.aPe && jogo.pessoa.nadando) return Hud.anunciar("Saia da água para usar os itens");
     if (jogo.noBarco && !["vara", "sinalizador"].includes(slot.tipo)) return Hud.anunciar("No barco dá para usar a vara de pescar e o sinalizador");
     if (!jogo.aPe && !jogo.noBarco) return Hud.anunciar("Desça do carro (E) para usar isso");
@@ -125,6 +151,16 @@ const Acoes = {
       case "sinalizador": return this.dispararSinal(jogo.pessoa);
       case "vara": return !jogo.noBarco && !this.pesca && this.temAlvoPerto(jogo.pessoa, GOLPES.vara.alcance) ? this.atacar(jogo.pessoa, GOLPES.vara) : this.pescar(jogo.pessoa);
       case "pedras": case "cartuchos": return Hud.anunciar(slot.tipo === "pedras" ? "Pedras são munição do estilingue" : "Cartuchos são munição do sinalizador");
+      case "taco": case "peDeCabra": case "frigideira": case "remo": case "guardaChuva":
+        return this.atacar(jogo.pessoa, GOLPES[slot.tipo]);
+      case "arco": return this.atirarFlecha(jogo.pessoa);
+      case "paintball": return this.atirarTinta(jogo.pessoa);
+      case "pistolaAgua": return this.esguichar(jogo.pessoa);
+      case "taser": return this.darChoque(jogo.pessoa);
+      case "bumerangue": return this.lancarBumerangue(jogo.pessoa);
+      case "flechas": return Hud.anunciar("Flechas são a munição do arco 🏹");
+      case "tinta": return Hud.anunciar("Bolinhas de tinta são a munição da arma de paintball 🎨");
+      case "baterias": return Hud.anunciar("Baterias carregam a arma de choque ⚡");
     }
   },
 
@@ -184,6 +220,7 @@ const Acoes = {
     const moradores = Moradores.golpear(origem, pessoa.direcao, golpe.alcance, golpe.forca);
     const acertos = Animais.golpear(origem, pessoa.direcao, golpe.alcance, golpe.forca) + moradores;
     if (acertos) Som.acertou();
+    if (acertos && golpe.toim) { Som.bip(1568, 0.6, { tipo: "triangle", volume: 0.07, freqFinal: 1490 }); Som.bip(2093, 0.4, { tipo: "sine", volume: 0.03 }); }   // TÓIM!
     // Bater em morador é crime: a polícia vem (golpe forte conta mais)
     if (moradores) Policia.crime(golpe.forca >= 6 ? 2 : 1, pessoa.posicao, golpe.forca >= 6 ? "agressão" : "briga");
   },
@@ -244,6 +281,305 @@ const Acoes = {
     Animais.assustar(p, 35); // o barulho espanta os bichos em volta
   },
 
+  // ---------- Armas de longe ----------
+
+  // Ponto de saída do tiro (na altura do peito, um pouco à frente) e a direção
+  saidaDoTiro(pessoa, alcanceMira = 35) {
+    const f = { x: Math.sin(pessoa.direcao), z: Math.cos(pessoa.direcao) }, p = pessoa.posicao;
+    const origem = new THREE.Vector3(p.x + f.x * 0.6, p.y + 1.35, p.z + f.z * 0.6);
+    // Mira assistida: morador ou bicho mais ou menos à frente
+    const alvo = this.alvoQualquer(pessoa, alcanceMira, 0.3);
+    let dir = new THREE.Vector3(f.x, 0.02, f.z);
+    if (alvo) dir = new THREE.Vector3(alvo.posicao.x - origem.x, alvo.posicao.y + 1.1 - origem.y, alvo.posicao.z - origem.z).normalize();
+    return { origem, dir, alvo };
+  },
+
+  // Morador ou bicho mais perto num "cone" à frente
+  alvoQualquer(pessoa, alcance, abertura) {
+    let melhor = null, menor = alcance;
+    const ver = o => {
+      const dx = o.posicao.x - pessoa.posicao.x, dz = o.posicao.z - pessoa.posicao.z, d = Math.hypot(dx, dz);
+      if (d > menor || d < 0.8) return;
+      if (Math.abs(Util.diferencaAngulo(Math.atan2(dx, dz), pessoa.direcao)) < abertura) { menor = d; melhor = o; }
+    };
+    for (const m of Moradores.lista) if (m.estado !== "emCasa" && m.estado !== "caido") ver(m);
+    for (const a of Animais.lista) ver(a);
+    return melhor;
+  },
+
+  // Morador encostando no ponto (para os tiros)
+  moradorEm(pos, raio) {
+    for (const m of Moradores.lista) {
+      if (m.estado === "emCasa" || m.estado === "caido" || !m.modelo.visible) continue;
+      if (Math.hypot(m.posicao.x - pos.x, m.posicao.z - pos.z) < raio + m.raio && pos.y > m.posicao.y - 0.1 && pos.y < m.posicao.y + 1.9) return m;
+    }
+    return null;
+  },
+
+  reagir(m, de, tipo, derruba, estrelas) {
+    const lista = FRASES_ARMA[tipo], frase = lista[Math.floor(Math.random() * lista.length)];
+    if (derruba) m.cair(de.x, de.z, frase);
+    else { m.fugir(de, 4); Hud.anunciar(`🗣️ ${m.nome}: ${frase}`); }
+    if (estrelas) Policia.crime(estrelas, Jogo.posicaoJogador(), tipo === "tinta" ? "vandalismo" : "agressão");
+  },
+
+  novoProjetil(dados) {
+    if (dados.malha) this.cena.add(dados.malha);
+    this.projeteis.push({ vida: 3, gravidade: 9.8, acertou: new Set(), ...dados });
+  },
+
+  // 🏹 Flecha: voa reto, cai devagar e fica espetada onde bater
+  atirarFlecha(pessoa) {
+    if (performance.now() - (this.ultimoTiro || 0) < 600) return;
+    if (!Inventario.gastar("flechas")) return Hud.anunciar("Sem flechas! Procure perto de onde achou o arco 🪶");
+    this.ultimoTiro = performance.now();
+    pessoa.golpear();
+    Som.estilingue(); Som.ruido(0.1, 0.04, 2500);
+    const { origem, dir } = this.saidaDoTiro(pessoa, 40);
+    const g = new THREE.Group();
+    Modelos.peca(g, "cilindro", 0xa16207, [0.02, 0.75, 0.02], [0, 0, 0], [Math.PI / 2, 0, 0]);
+    Modelos.peca(g, "cone", 0x9ca3af, [0.05, 0.1, 0.05], [0, 0, 0.42], [Math.PI / 2, 0, 0]);
+    Modelos.peca(g, "cubo", 0xdc2626, [0.006, 0.06, 0.14], [0, 0, -0.3]);
+    Modelos.peca(g, "cubo", 0xdc2626, [0.06, 0.006, 0.14], [0, 0, -0.3]);
+    g.position.copy(origem);
+    const v = 36;
+    this.novoProjetil({ tipo: "flecha", malha: g, vx: dir.x * v, vy: dir.y * v + 1.2, vz: dir.z * v, gravidade: 5, vida: 3 });
+    const resta = Inventario.quantidade("flechas");
+    if (resta <= 3) Hud.anunciar(resta ? `🪶 Restam ${resta} flechas` : "🪶 Essa era a última flecha!");
+  },
+
+  // 🎨 Paintball: bolinha rápida que estoura e deixa uma mancha colorida
+  atirarTinta(pessoa) {
+    if (performance.now() - (this.ultimoTiro || 0) < 220) return;
+    if (!Inventario.gastar("tinta")) return Hud.anunciar("Sem bolinhas de tinta! Tem no farol e na feira 🔵");
+    this.ultimoTiro = performance.now();
+    pessoa.golpear();
+    Som.ruido(0.08, 0.06, 1800); Som.bip(320, 0.06, { tipo: "square", volume: 0.03 });
+    const { origem, dir } = this.saidaDoTiro(pessoa, 35);
+    const cores = [0xec4899, 0x22c55e, 0xfacc15, 0x3b82f6, 0xf97316, 0xa855f7], cor = cores[Math.floor(Math.random() * cores.length)];
+    const bola = new THREE.Mesh(this.geoPedra, new THREE.MeshBasicMaterial({ color: cor }));
+    bola.scale.setScalar(1.1);
+    bola.position.copy(origem);
+    const v = 40;
+    this.novoProjetil({ tipo: "tinta", malha: bola, cor, vx: dir.x * v, vy: dir.y * v + 0.8, vz: dir.z * v, gravidade: 4, vida: 1.6 });
+  },
+
+  // 💦 Pistola d'água: um jato que cai em arco
+  esguichar(pessoa) {
+    if (performance.now() - (this.ultimoTiro || 0) < 250) return;
+    if (this.tanqueAgua <= 0) return Hud.anunciar("💧 A pistola está vazia! Entre na água (mar, lago ou rio) para encher");
+    this.ultimoTiro = performance.now();
+    this.tanqueAgua--;
+    pessoa.golpear();
+    Som.ruido(0.25, 0.04, 2200);
+    const { origem, dir } = this.saidaDoTiro(pessoa, 14);
+    const v = 15;
+    this.novoProjetil({ tipo: "agua", vx: dir.x * v, vy: dir.y * v + 2.5, vz: dir.z * v, gravidade: 9.8, vida: 1.4, pos: origem.clone() });
+    if (this.tanqueAgua === 5) Hud.anunciar("💧 A água da pistola está acabando");
+  },
+
+  // ⚡ Choque: um raio até o alvo (até 10 m); morador fica tonto vendo estrelinhas
+  darChoque(pessoa) {
+    if (performance.now() - (this.ultimoTiro || 0) < 1200) return;
+    if (!Inventario.gastar("baterias")) return Hud.anunciar("Sem baterias! Tem umas perto da delegacia 🔋");
+    this.ultimoTiro = performance.now();
+    pessoa.golpear();
+    Som.bip(90, 0.35, { tipo: "sawtooth", volume: 0.06, freqFinal: 60 }); Som.ruido(0.3, 0.07, 5000);
+    const alvo = this.alvoQualquer(pessoa, 10, 0.4);
+    const f = { x: Math.sin(pessoa.direcao), z: Math.cos(pessoa.direcao) }, p = pessoa.posicao;
+    const de = new THREE.Vector3(p.x + f.x * 0.5, p.y + 1.25, p.z + f.z * 0.5);
+    const ate = alvo ? new THREE.Vector3(alvo.posicao.x, alvo.posicao.y + 1.1, alvo.posicao.z) : de.clone().add(new THREE.Vector3(f.x * 5, 0, f.z * 5));
+    // Raio em zigue-zague
+    if (!this.raio) {
+      this.raio = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x93c5fd }));
+      this.raio.frustumCulled = false;
+      this.cena.add(this.raio);
+    }
+    const pts = [];
+    for (let k = 0; k <= 10; k++) {
+      const q = de.clone().lerp(ate, k / 10);
+      if (k > 0 && k < 10) q.add(new THREE.Vector3((Math.random() - 0.5) * 0.35, (Math.random() - 0.5) * 0.35, (Math.random() - 0.5) * 0.35));
+      pts.push(q);
+    }
+    this.raio.geometry.setFromPoints(pts);
+    this.raio.visible = true;
+    this.tempoRaio = 0.18;
+    for (let i = 0; i < 10; i++) Particulas.emitir(ate.x, ate.y, ate.z, { vx: (Math.random() - 0.5) * 4, vy: Math.random() * 3, vz: (Math.random() - 0.5) * 4, cor: "#bfdbfe", tamanho: 0.12, vida: 0.4, gravidade: 6, alfa: 1, crescer: 0 });
+    if (!alvo) return;
+    if (alvo instanceof Morador) {
+      this.reagir(alvo, p, "choque", true, 2);
+      alvo.timer = 6;                         // fica mais tempo no chão, tonto
+      this.tontos.push({ m: alvo, t: 6 });
+    } else {
+      alvo.atingido(f.x, f.z, 6);
+    }
+    Som.acertou();
+    const resta = Inventario.quantidade("baterias");
+    if (resta <= 1) Hud.anunciar(resta ? "🔋 Só mais 1 bateria" : "🔋 As baterias acabaram");
+  },
+
+  // 🪃 Bumerangue: vai, faz a curva e volta para a mão
+  lancarBumerangue(pessoa) {
+    if (this.projeteis.some(p => p.tipo === "bumerangue")) return;
+    Inventario.gastar("bumerangue");
+    pessoa.golpear();
+    Som.lancar();
+    const modelo = ItensNoMundo.criarModelo("bumerangue");
+    modelo.scale.setScalar(1.6);
+    const { origem, dir } = this.saidaDoTiro(pessoa, 18);
+    modelo.position.copy(origem);
+    const v = 17;
+    this.novoProjetil({ tipo: "bumerangue", malha: modelo, vx: dir.x * v, vy: 0.5, vz: dir.z * v, gravidade: 0, vida: 7, ida: 1.0,
+                        lado: { x: dir.z, z: -dir.x } });
+  },
+
+  // 🔱 Arpão: só debaixo d'água; se passar num cardume, pega um peixe
+  dispararArpao(pessoa) {
+    if (!pessoa.submerso) return Hud.anunciar(pessoa.nadando ? "Mergulhe (Shift) para usar o arpão 🤿" : "O arpão só funciona debaixo d'água 🤿");
+    if (performance.now() - (this.ultimoTiro || 0) < 1300) return;
+    this.ultimoTiro = performance.now();
+    pessoa.golpear();
+    Som.bip(400, 0.15, { tipo: "triangle", volume: 0.05, freqFinal: 150 });
+    const f = { x: Math.sin(pessoa.direcao), z: Math.cos(pessoa.direcao) }, p = pessoa.posicao;
+    const lanca = ItensNoMundo.criarModelo("arpao");
+    lanca.position.set(p.x + f.x * 0.8, p.y + 0.3, p.z + f.z * 0.8);
+    this.novoProjetil({ tipo: "arpao", malha: lanca, vx: f.x * 18, vy: 0, vz: f.z * 18, gravidade: 0, vida: 0.75 });
+  },
+
+  // Mancha de tinta no chão (some sozinha depois de um tempo)
+  mancha(x, y, z, cor) {
+    for (let i = 0; i < 12; i++) Particulas.emitir(x, y + 0.1, z, { vx: (Math.random() - 0.5) * 4, vy: 1 + Math.random() * 2, vz: (Math.random() - 0.5) * 4,
+      cor: new THREE.Color(cor), tamanho: 0.14, vida: 0.5, gravidade: 9, alfa: 1, crescer: 0 });
+    if (Terreno.nivelAgua(x, z) > y) return;     // na água, a tinta se desfaz
+    this.geoMancha = this.geoMancha || new THREE.CircleGeometry(0.45, 9).rotateX(-Math.PI / 2);
+    const m = new THREE.Mesh(this.geoMancha, new THREE.MeshBasicMaterial({ color: cor, transparent: true, opacity: 0.9, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 }));
+    m.position.set(x, y + 0.04, z);
+    m.scale.set(0.7 + Math.random() * 0.6, 1, 0.7 + Math.random() * 0.6);
+    m.rotation.y = Math.random() * 6;
+    this.cena.add(m);
+    this.manchas.push({ malha: m, vida: 45 });
+    if (this.manchas.length > 60) { const velha = this.manchas.shift(); this.cena.remove(velha.malha); velha.malha.material.dispose(); }
+  },
+
+  // Anda com cada projétil e vê no que ele bateu
+  atualizarProjeteis(dt, jogo) {
+    const pessoa = jogo.pessoa;
+    for (const p of this.projeteis) {
+      const pos = p.malha ? p.malha.position : p.pos;
+      if (p.preso) { p.vida -= dt; continue; }            // flecha espetada: só espera sumir
+      p.vida -= dt;
+
+      // Bumerangue: depois de "ida" segundos, faz a curva e volta para você
+      if (p.tipo === "bumerangue") {
+        p.ida -= dt;
+        if (p.ida > 0) { p.vx += p.lado.x * 9 * dt; p.vz += p.lado.z * 9 * dt; }
+        else {
+          const alvo = jogo.posicaoJogador(), dx = alvo.x - pos.x, dy = alvo.y + 1.2 - pos.y, dz = alvo.z - pos.z, d = Math.hypot(dx, dy, dz) || 1;
+          p.vx = Util.lerp(p.vx, dx / d * 18, Math.min(1, dt * 4)); p.vy = Util.lerp(p.vy, dy / d * 18, Math.min(1, dt * 4)); p.vz = Util.lerp(p.vz, dz / d * 18, Math.min(1, dt * 4));
+          if (d < 1.3) { p.vida = 0; p.pego = true; }
+        }
+        p.malha.rotation.y += dt * 22;
+      }
+
+      p.vy -= p.gravidade * dt;
+      pos.x += p.vx * dt; pos.y += p.vy * dt; pos.z += p.vz * dt;
+      if (p.tipo === "flecha" || p.tipo === "arpao") p.malha.lookAt(pos.x + p.vx, pos.y + p.vy, pos.z + p.vz);
+      if (p.tipo === "agua") for (let k = 0; k < 3; k++) Particulas.emitir(pos.x, pos.y, pos.z, { vx: p.vx * 0.3 + (Math.random() - 0.5), vy: p.vy * 0.3, vz: p.vz * 0.3 + (Math.random() - 0.5), cor: "#bae6fd", tamanho: 0.16, vida: 0.35, gravidade: 9, alfa: 0.8, crescer: 0 });
+      const v = Math.hypot(p.vx, p.vz) || 1, dirX = p.vx / v, dirZ = p.vz / v;
+      const de = { x: pos.x - dirX * 3, z: pos.z - dirZ * 3 };
+
+      // Arpão: fora d'água para; cardume perto = peixe!
+      if (p.tipo === "arpao") {
+        if (pos.y > Terreno.nivelAgua(pos.x, pos.z)) p.vida = 0;
+        const cardume = Animais.cardumePerto(pos.x, pos.z, 4);
+        if (cardume && p.vida > 0) {
+          p.vida = 0;
+          const ok = Inventario.quantidade("peixe") < LIMITE_CARGA.peixe && Inventario.adicionar("peixe", 1);
+          Hud.anunciar(ok ? "🔱 Pescou um peixe com o arpão!" : "🔱 Acertou um peixe, mas não cabe mais nenhum");
+          if (ok) Som.pegar();
+        }
+        if (Animais.atingirEm(pos, 0.3, dirX, dirZ)) { p.vida = 0; Som.acertou(); }
+        continue;
+      }
+
+      // Moradores e bichos
+      const m = this.moradorEm(pos, p.tipo === "agua" ? 0.5 : 0.2);
+      if (m && !p.acertou.has(m)) {
+        p.acertou.add(m);
+        Som.acertou();
+        if (p.tipo === "flecha") { this.reagir(m, de, "flecha", true, 2); p.vida = 0; }
+        if (p.tipo === "tinta") { this.reagir(m, de, "tinta", false, 1); this.mancha(pos.x, Casas.alturaChao(pos.x, pos.z, pos.y), pos.z, p.cor); p.vida = 0; }
+        if (p.tipo === "agua") { this.reagir(m, de, "agua", false, 0); p.vida = 0; }
+        if (p.tipo === "bumerangue") { this.reagir(m, de, "bumerangue", false, 1); p.ida = Math.min(p.ida, 0); }
+        continue;
+      }
+      if (p.tipo === "agua") { if (Animais.lista.some(a => Math.hypot(a.posicao.x - pos.x, a.posicao.z - pos.z) < 1.2)) { Animais.assustar(pos, 8); p.vida = 0; } }
+      else if (!p.acertouBicho && Animais.atingirEm(pos, 0.2, dirX, dirZ)) {
+        Som.acertou();
+        if (p.tipo === "bumerangue") { p.acertouBicho = true; p.ida = Math.min(p.ida, 0); }
+        else { if (p.tipo === "tinta") this.mancha(pos.x, Terreno.altura(pos.x, pos.z), pos.z, p.cor); p.vida = 0; continue; }
+      }
+
+      // Chão, água, árvores e paredes
+      const chao = Casas.alturaChao(pos.x, pos.z, pos.y + 0.5);
+      const naAgua = pos.y < Terreno.nivelAgua(pos.x, pos.z);
+      const arvore = Natureza.proximos(pos.x, pos.z).find(o => o.raio > 0 && o.raio < 1.6 && Math.hypot(o.x - pos.x, o.z - pos.z) < o.raio && pos.y < chao + 7);
+      const parede = Casas.ocupado(pos.x, pos.z, 0) && pos.y < chao + 4 && !jogo.onde;
+      if (p.tipo === "bumerangue") {
+        if ((arvore || parede || pos.y < chao + 0.3) && p.ida > 0) p.ida = 0;      // bateu: volta mais cedo
+        if (pos.y < chao + 0.4) pos.y = chao + 0.4;
+        continue;
+      }
+      if (pos.y <= chao || naAgua || arvore || parede) {
+        if (naAgua) { Som.agua(); for (let i = 0; i < 6; i++) Particulas.emitir(pos.x, Terreno.nivelAgua(pos.x, pos.z), pos.z, { vx: (Math.random() - 0.5) * 2, vy: 2, vz: (Math.random() - 0.5) * 2, cor: "#e0f2fe", tamanho: 0.2, vida: 0.5, gravidade: 9, alfa: 0.9 }); }
+        if (p.tipo === "flecha" && !naAgua) { p.preso = true; p.vida = 20; Som.ruido(0.05, 0.05, 900); }   // fica espetada
+        else if (p.tipo === "tinta" && !naAgua) { this.mancha(pos.x, Math.max(chao, pos.y - 0.2), pos.z, p.cor); p.vida = 0; }
+        else p.vida = 0;
+        if (p.tipo === "agua" && !naAgua) for (let i = 0; i < 8; i++) Particulas.emitir(pos.x, chao + 0.1, pos.z, { vx: (Math.random() - 0.5) * 3, vy: 1.5, vz: (Math.random() - 0.5) * 3, cor: "#bae6fd", tamanho: 0.18, vida: 0.4, gravidade: 9, alfa: 0.8, crescer: 0 });
+      }
+    }
+    // Remove os que acabaram (o bumerangue volta para o inventário, ou cai no chão)
+    for (const p of this.projeteis.filter(p => p.vida <= 0)) {
+      if (p.malha) this.cena.remove(p.malha);
+      if (p.tipo === "bumerangue") {
+        if (p.pego && Inventario.adicionar("bumerangue") === true) { Som.pegar(); Hud.anunciar("🪃 Pegou o bumerangue de volta!"); }
+        else {
+          const pos = p.malha.position;
+          ItensNoMundo.adicionar("bumerangue", pos.x, Terreno.altura(pos.x, pos.z), pos.z);
+          Hud.anunciar(p.pego ? "🪃 Inventário cheio: o bumerangue caiu no chão" : "🪃 O bumerangue caiu ali perto. Vá buscar!");
+        }
+      }
+    }
+    this.projeteis = this.projeteis.filter(p => p.vida > 0);
+
+    // Manchas de tinta somem aos poucos
+    for (const m of this.manchas) {
+      m.vida -= dt;
+      if (m.vida < 5) m.malha.material.opacity = Math.max(0, m.vida / 5) * 0.9;
+    }
+    for (const m of this.manchas.filter(m => m.vida <= 0)) { this.cena.remove(m.malha); m.malha.material.dispose(); }
+    this.manchas = this.manchas.filter(m => m.vida > 0);
+
+    // Raio do choque pisca e some
+    if (this.raio && this.raio.visible && (this.tempoRaio -= dt) <= 0) this.raio.visible = false;
+    // Estrelinhas girando em cima de quem levou choque
+    for (const t of this.tontos) {
+      t.t -= dt;
+      if (t.m.estado !== "caido") t.t = 0;
+      if (Math.random() < dt * 12) {
+        const a = performance.now() / 200 + Math.random() * 6, q = t.m.posicao;
+        Particulas.emitir(q.x + Math.cos(a) * 0.4, q.y + 0.6, q.z + Math.sin(a) * 0.4, { vx: -Math.sin(a), vy: 0.3, vz: Math.cos(a), cor: "#fde047", tamanho: 0.14, vida: 0.5, gravidade: 0, alfa: 1, crescer: 0 });
+      }
+    }
+    this.tontos = this.tontos.filter(t => t.t > 0);
+
+    // A pistola d'água enche quando você está dentro d'água
+    if (jogo.aPe && this.tanqueAgua < TANQUE_AGUA && (pessoa.nadando || Terreno.profundidade(pessoa.posicao.x, pessoa.posicao.z) > 0.2) && Inventario.quantidade("pistolaAgua")) {
+      this.tanqueAgua = TANQUE_AGUA;
+      Hud.anunciar("💦 Pistola d'água cheia!");
+    }
+  },
+
   // ---------- Pesca ----------
 
   pescar(pessoa) {
@@ -294,6 +630,7 @@ const Acoes = {
 
   atualizar(dt, jogo) {
     const t = performance.now() / 1000;
+    this.atualizarProjeteis(dt, jogo);
 
     // Pedras do estilingue
     for (const p of this.pedras) {

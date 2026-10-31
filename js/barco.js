@@ -176,6 +176,7 @@ class Barco {
     this.usandoNitro = controle.nitro && this.nitro > 0 && controle.acelerar > 0;
     if (this.usandoNitro) { maxima *= 1.35; aceleracao *= 1.6; this.nitro = Math.max(0, this.nitro - dt); }
     else if (!controle.nitro) this.nitro = Math.min(4, this.nitro + 0.4 * dt);
+    if (Inventario.quantidade("remo")) { maxima *= 1.25; aceleracao *= 1.3; }   // com o remo, o barco anda mais
 
     if (controle.acelerar > 0 && vFrente < maxima) vFrente += aceleracao * (1.1 - Math.max(0, vFrente) / maxima) * dt;
     if (controle.frear > 0) vFrente = Math.max(-5, vFrente - 8 * dt);

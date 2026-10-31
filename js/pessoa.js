@@ -33,6 +33,7 @@ class Pessoa {
     this.modeloNaMao = ItensNoMundo.criarModelo(tipo);
     this.modeloNaMao.position.set(0, -0.06, 0.05);
     if (tipo === "vara") this.modeloNaMao.position.set(0, -0.06, 0.5);
+    if (tipo === "arco") this.modeloNaMao.position.set(0, -0.45, -0.45);   // segura o arco pela empunhadura
     this.maos[0].add(this.modeloNaMao);
   }
 
@@ -153,6 +154,9 @@ class Pessoa {
       this.noChao = false;
     }
     this.vy -= 20 * dt;
+    // Guarda-chuva aberto: cai devagarinho, planando
+    this.planando = this.itemNaMao === "guardaChuva" && !this.noChao && this.vy < -2.2 && !this.nadando;
+    if (this.planando) this.vy = Math.max(this.vy, -2.2);
     p.y += this.vy * dt;
     if (p.y <= chao) {
       p.y = chao;
@@ -275,6 +279,21 @@ class Pessoa {
     this.bracos[0].rotation.x = -balanco * 0.9;
     this.bracos[1].rotation.x = balanco * 0.9;
     if (!this.noChao) { this.bracos[0].rotation.x = this.bracos[1].rotation.x = -2.6; }
+    // Guarda-chuva aberto em cima da cabeça enquanto plana
+    if (this.planando && !this.copaGuardaChuva) {
+      const g = new THREE.Group();
+      const copa = new THREE.Mesh(new THREE.ConeGeometry(1.05, 0.5, 10, 1, true), new THREE.MeshLambertMaterial({ color: 0x7c3aed, side: THREE.DoubleSide }));
+      copa.position.y = 0.25;
+      const cabo = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.1, 5), Modelos.mat(0x1f2937));
+      cabo.position.y = -0.3;
+      g.add(copa, cabo);
+      g.position.set(-0.2, 2.55, 0.05);
+      g.traverse(o => { o.castShadow = true; });
+      this.modelo.add(g);
+      this.copaGuardaChuva = g;
+    }
+    if (this.copaGuardaChuva) this.copaGuardaChuva.visible = !!this.planando;
+    if (this.modeloNaMao) this.modeloNaMao.visible = !this.planando;   // o fechado some: agora ele está aberto em cima
 
     // Braço direito: segura o item à frente; no golpe, ergue e desce rápido
     const tipoItem = this.itemNaMao && ITENS[this.itemNaMao].tipo;
@@ -302,6 +321,8 @@ class Pessoa {
       this.bracos[0].rotation.x = -2.4 + (1 - this.tempoGolpe / 0.3) * 2.2;
     } else if (this.itemNaMao === "vara" && Acoes.pesca) {
       this.bracos[0].rotation.x = -1.1;                       // vara erguida pescando
+    } else if (this.planando) {
+      this.bracos[0].rotation.x = -3.0;                       // braço erguido segurando o guarda-chuva
     } else if (segurando) {
       this.bracos[0].rotation.x = -0.7 + balanco * 0.2;
     }

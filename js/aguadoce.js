@@ -180,23 +180,67 @@ const AguaDoce = {
         vao: Math.min(36, canal / seno + (largura + T.celula + 2) * cosseno / seno + T.celula + 1.5), largura
       });
       b.y = a.y + (c.y - a.y) * b.t;
-      // Altura da estrada ao longo da ponte, metro a metro (a estrada pode fazer curva e subir)
-      b.perfil = [];
-      for (let u = -b.vao; u <= b.vao + 0.01; u += 1) {
-        const e = T.estradaMaisProxima(b.x + b.dx * u, b.z + b.dz * u);
-        b.perfil.push(e.praca ? b.y : T.alturaDaEstrada(e));
-      }
+      // A ponte segue a estrada metro a metro (antes ela era um retângulo reto e, quando a
+      // estrada fazia curva em cima do rio, ficava metade para fora da pista)
+      b.linha = this.linhaDaEstrada(T.estradas[b.estrada], b.indice, b.t, b.vao);
+      b.perfil = b.linha.map(q => { const e = T.estradaMaisProxima(q.x, q.z); return e.praca ? b.y : T.alturaDaEstrada(e); });
+      const folga = b.largura + 4;
+      b.min = { x: Math.min(...b.linha.map(q => q.x)) - folga, z: Math.min(...b.linha.map(q => q.z)) - folga };
+      b.max = { x: Math.max(...b.linha.map(q => q.x)) + folga, z: Math.max(...b.linha.map(q => q.z)) + folga };
       this.pontes.push(b);
     }
+  },
+
+  // Pontos do meio da estrada, de metro em metro, de -vao até +vao em volta do ponto (indice, t)
+  // Cada ponto guarda a direção da estrada ali (dx, dz)
+  linhaDaEstrada(estrada, indice, t, vao) {
+    const pts = estrada.pontos, n = pts.length;
+    const ponto = k => estrada.fechada ? pts[((k % n) + n) % n] : pts[Math.max(0, Math.min(n - 1, k))];
+    // Um trecho da estrada em volta da ponte, com a distância acumulada
+    const raio = Math.ceil(vao / 2) + 6, trecho = [];
+    for (let k = indice - raio; k <= indice + raio + 1; k++) trecho.push(ponto(k));
+    const acum = [0];
+    for (let k = 1; k < trecho.length; k++) acum.push(acum[k - 1] + Math.hypot(trecho[k].x - trecho[k - 1].x, trecho[k].z - trecho[k - 1].z));
+    const s0 = acum[raio] + (acum[raio + 1] - acum[raio]) * t;
+    const linha = [];
+    for (let u = -vao; u <= vao + 0.01; u += 1) {
+      const s = s0 + u;
+      let k = 0;
+      while (k < trecho.length - 2 && (acum[k + 1] <= s || acum[k + 1] - acum[k] < 1e-6)) k++;
+      const a = trecho[k], c = trecho[k + 1], len = (acum[k + 1] - acum[k]) || 1;
+      const f = (s - acum[k]) / len;              // pode passar de 0..1 no fim de uma rua: continua reto
+      const dx = (c.x - a.x) / len, dz = (c.z - a.z) / len;
+      linha.push({ x: a.x + (c.x - a.x) * f, z: a.z + (c.z - a.z) * f, dx, dz });
+    }
+    // Direção suavizada (média dos vizinhos): as curvas da ponte ficam redondinhas
+    return linha.map((q, i) => {
+      const p0 = linha[Math.max(0, i - 1)], p1 = linha[Math.min(linha.length - 1, i + 1)];
+      const dx = p1.x - p0.x, dz = p1.z - p0.z, d = Math.hypot(dx, dz) || 1;
+      return { x: q.x, z: q.z, dx: dx / d, dz: dz / d };
+    });
+  },
+
+  // Ponto da ponte em "u" metros do meio (com fração), com a altura
+  amostraPonte(b, u) {
+    const f = Util.limitar(u + b.vao, 0, b.linha.length - 1.001), i = Math.floor(f), r = f - i;
+    const a = b.linha[i], c = b.linha[i + 1];
+    const dx = Util.lerp(a.dx, c.dx, r), dz = Util.lerp(a.dz, c.dz, r), d = Math.hypot(dx, dz) || 1;
+    return { x: Util.lerp(a.x, c.x, r), z: Util.lerp(a.z, c.z, r), y: Util.lerp(b.perfil[i], b.perfil[i + 1], r), dx: dx / d, dz: dz / d };
   },
 
   // Está em cima do tabuleiro de alguma ponte? Devolve a altura dele (ou null)
   // (folga > 0 = só a parte do meio: é onde dá para cavar sem fazer buraco nas pontas da ponte)
   alturaPonte(x, z, folga = 0, maisLargura = 0) {
     for (const b of this.pontes) {
-      const rx = x - b.x, rz = z - b.z;
-      if (Math.abs(rx) > b.vao + b.largura || Math.abs(rz) > b.vao + b.largura) continue;
-      const u = rx * b.dx + rz * b.dz, v = rx * b.dz - rz * b.dx;
+      if (x < b.min.x - maisLargura || x > b.max.x + maisLargura || z < b.min.z - maisLargura || z > b.max.z + maisLargura) continue;
+      // ponto da linha da ponte mais perto
+      let j = 0, menor = Infinity;
+      for (let k = 0; k < b.linha.length; k++) {
+        const q = b.linha[k], d = (q.x - x) * (q.x - x) + (q.z - z) * (q.z - z);
+        if (d < menor) { menor = d; j = k; }
+      }
+      const q = b.linha[j], rx = x - q.x, rz = z - q.z;
+      const u = j - b.vao + Util.limitar(rx * q.dx + rz * q.dz, -0.5, 0.5), v = rx * q.dz - rz * q.dx;
       if (Math.abs(u) < b.vao - folga && Math.abs(v) < b.largura + maisLargura) {
         const f = u + b.vao, i = Math.min(b.perfil.length - 2, Math.floor(f));
         return Util.lerp(b.perfil[i], b.perfil[i + 1], f - i);
@@ -368,29 +412,40 @@ const AguaDoce = {
   criarPontes() {
     this.obstaculos = [];
     for (const b of this.pontes) {
-      // Feita em pedaços de 3 m, cada um na altura da estrada naquele ponto (tudo numa malha só)
-      const pecas = [], W = b.largura, ang = Math.atan2(b.dx, b.dz), cos = Math.cos(ang), sin = Math.sin(ang);
-      const mundo = (lx, lz) => ({ x: b.x + lx * cos + lz * sin, z: b.z - lx * sin + lz * cos });
-      const yEm = u => this.alturaPonte(b.x + b.dx * u, b.z + b.dz * u) ?? b.y;
-      for (let u = -b.vao + 1.5; u < b.vao - 1; u += 3) {
-        const y = yEm(u), rot = [-Math.atan((yEm(u + 1) - yEm(u - 1)) / 2), 0, 0];
-        pecas.push({ forma: "cubo", cor: 0xa8a29e, pos: [0, y - 0.25, u], esc: [W * 2, 0.7, 3.05], rot });          // tabuleiro
-        pecas.push({ forma: "cubo", cor: 0x78716c, pos: [0, y - 0.82, u], esc: [W * 2 - 1, 0.5, 3.05], rot });      // viga
+      // Feita em pedaços de 2 m, cada um virado para onde a estrada vai e na altura dela (tudo numa malha só)
+      const pecas = [], W = b.largura;
+      const caixa = (q, lx, ly, lu, esc, cor, inclinar = true) => {
+        const g = new THREE.BoxGeometry(1, 1, 1);
+        g.scale(...esc);
+        if (inclinar) g.rotateX(-Math.atan((this.amostraPonte(b, lu + 1).y - this.amostraPonte(b, lu - 1).y) / 2));
+        g.rotateY(Math.atan2(q.dx, q.dz));
+        g.translate(q.x + lx * q.dz, ly, q.z - lx * q.dx);
+        pecas.push({ geo: g, cor, pos: [0, 0, 0], esc: [1, 1, 1] });
+      };
+      for (let u = -b.vao + 1; u <= b.vao - 1; u += 2) {
+        const q = this.amostraPonte(b, u), y = q.y;
+        caixa(q, 0, y - 0.25, u, [W * 2, 0.7, 2.25], 0xa8a29e);           // tabuleiro
+        caixa(q, 0, y - 0.82, u, [W * 2 - 1, 0.5, 2.25], 0x78716c);       // viga
         for (const lado of [-1, 1]) {
-          pecas.push({ forma: "cubo", cor: 0xd6d3d1, pos: [lado * (W - 0.2), y + 0.47, u], esc: [0.35, 0.75, 3.05], rot });   // mureta
-          pecas.push({ forma: "cubo", cor: 0x9ca3af, pos: [lado * (W - 0.2), y + 0.88, u], esc: [0.45, 0.1, 3.1], rot });
-          this.obstaculos.push(mundo(lado * (W - 0.2), u - 0.75), mundo(lado * (W - 0.2), u + 0.75));
+          caixa(q, lado * (W - 0.2), y + 0.47, u, [0.35, 0.75, 2.25], 0xd6d3d1);   // mureta
+          caixa(q, lado * (W - 0.2), y + 0.88, u, [0.45, 0.1, 2.3], 0x9ca3af);
         }
       }
-      for (const lado of [-1, 1]) {                                                  // cabeceiras (apoios nas pontas)
-        const u = lado * (b.vao - 0.6), y = yEm(u);
-        pecas.push({ forma: "cubo", cor: 0x9ca3af, pos: [0, y - 2.0, u], esc: [W * 2 + 0.4, 3.4, 1.0] });
+      // As muretas batem: um ponto a cada metro dos dois lados
+      for (let u = -b.vao + 0.5; u <= b.vao - 0.5; u += 1) {
+        const q = this.amostraPonte(b, u);
+        for (const lado of [-1, 1]) this.obstaculos.push({ x: q.x + lado * (W - 0.2) * q.dz, z: q.z - lado * (W - 0.2) * q.dx });
       }
-      if (b.vao > 14) for (const u of [-b.vao / 3, b.vao / 3]) pecas.push({ forma: "cubo", cor: 0x9ca3af, pos: [0, yEm(u) - 3, u], esc: [W * 1.4, 4.5, 0.9] });   // pilares
+      for (const lado of [-1, 1]) {                                                  // cabeceiras (apoios nas pontas)
+        const u = lado * (b.vao - 0.6), q = this.amostraPonte(b, u);
+        caixa(q, 0, q.y - 2.0, u, [W * 2 + 0.4, 3.4, 1.0], 0x9ca3af, false);
+      }
+      if (b.vao > 14) for (const u of [-b.vao / 3, b.vao / 3]) {                     // pilares
+        const q = this.amostraPonte(b, u);
+        caixa(q, 0, q.y - 3, u, [W * 1.4, 4.5, 0.9], 0x9ca3af, false);
+      }
       const m = Corpo.mesclar(pecas);
       m.material = this.materialPonte || (this.materialPonte = new THREE.MeshLambertMaterial({ vertexColors: true }));
-      m.position.set(b.x, 0, b.z);
-      m.rotation.y = ang;
       m.receiveShadow = true;
       this.grupo.add(m);
     }
