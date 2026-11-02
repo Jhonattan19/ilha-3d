@@ -164,6 +164,34 @@ const Acoes = {
     }
   },
 
+  // Q: solta o item da mão no chão, na sua frente (tudo = o monte inteiro)
+  soltar(jogo, tudo = false) {
+    const i = Inventario.selecionado, slot = Inventario.slots[i];
+    if (!slot) return Hud.anunciar("Mão vazia: escolha um item (1 a 6) para soltar");
+    if (!jogo.aPe) return Hud.anunciar("Desça do veículo para soltar itens");
+    if (jogo.pessoa.nadando) return Hud.anunciar("Saia da água para soltar itens (senão ele afunda!)");
+    const def = ITENS[slot.tipo];
+    if (slot.tipo === "documento") return Hud.anunciar("🪪 Seus documentos ficam sempre com você");
+    const quantidade = tudo || def.unico ? slot.quantidade : 1;
+    slot.quantidade -= quantidade;
+    if (slot.quantidade <= 0) Inventario.slots[i] = null;
+    if (slot.tipo === "vara") this.cancelarPesca();
+    // Cai um pouco à frente (se tiver parede na frente, cai no pé)
+    const p = jogo.pessoa.posicao, f = { x: Math.sin(jogo.pessoa.direcao), z: Math.cos(jogo.pessoa.direcao) };
+    let x = p.x + f.x * 0.9, z = p.z + f.z * 0.9;
+    const teste = { x, y: p.y, z };
+    Casas.resolverCirculo(teste, 0.25);
+    if (Math.hypot(teste.x - x, teste.z - z) > 0.05) { x = p.x + f.x * 0.3; z = p.z + f.z * 0.3; }
+    const y = Casas.alturaChao(x, z, p.y + 0.5);
+    // Se já tem um monte igual ali, junta
+    const monte = !def.unico && ItensNoMundo.lista.find(it => it.ativo && !it.renasce && it.tipo === slot.tipo && Math.hypot(it.x - x, it.z - z) < 1 && Math.abs(it.y - y) < 0.5);
+    if (monte) monte.quantidade += quantidade;
+    else ItensNoMundo.adicionar(slot.tipo, x, y, z, { quantidade });
+    Som.bip(520, 0.08, { tipo: "triangle", volume: 0.04, freqFinal: 300 });
+    const resta = Inventario.quantidade(slot.tipo);
+    Hud.anunciar(`⤓ Soltou: ${def.icone} ${def.nome}${quantidade > 1 ? " x" + quantidade : ""}${!def.unico && resta ? ` (ficou com ${resta})` : ""}`);
+  },
+
   consumir(tipo, def) {
     const precisaComer = (def.fome || 0) > 0 && Status.fome < 99;
     const precisaCurar = (def.vida || 0) > 0 && Status.vida < 99;

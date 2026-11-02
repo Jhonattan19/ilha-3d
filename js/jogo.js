@@ -382,6 +382,15 @@ const Jogo = {
       if (Entrada.apertou(`Digit${i + 1}`, `Numpad${i + 1}`)) Inventario.selecionado = i;
     }
     if (Entrada.apertou("KeyF")) Acoes.usar(this);
+    // Q: toque rápido solta 1 · segurando meio segundo solta o monte inteiro
+    // (o tempo é medido no relógio de verdade: mesmo com o celular engasgando, meio segundo é meio segundo)
+    if (Entrada.segurando("KeyQ")) {
+      if (!this.inicioSoltar) this.inicioSoltar = performance.now();
+      if (performance.now() - this.inicioSoltar >= 500 && !this.soltouTudo) { this.soltouTudo = true; Acoes.soltar(this, true); }
+    } else {
+      if ((this.inicioSoltar || Entrada.apertou("KeyQ")) && !this.soltouTudo) Acoes.soltar(this, false);
+      this.inicioSoltar = 0; this.soltouTudo = false;
+    }
     Status.atualizar(dt);
     if (this.estado !== "jogando") return;
     if (this.noAviao) return this.atualizarAviao(dt);

@@ -60,6 +60,7 @@ const Toque = {
         <button data-tecla="KeyF" class="bt grande usar-toque"><b>F</b><small>usar</small></button>
         <button data-tecla="Space" class="bt medio" id="btEspaco"><b>⤒</b><small id="rotuloEspaco">pular</small></button>
         <button data-tecla="ShiftLeft" class="bt medio" id="btShift"><b>⚡</b><small id="rotuloShift">correr</small></button>
+        <button data-tecla="KeyQ" class="bt pequeno" id="btSoltar"><b>⤓</b><small>soltar</small></button>
       </div>
       <div class="pedais-toque">
         <button data-tecla="KeyW" class="bt pedal"><b>▲</b><small>acelera</small></button>

@@ -471,7 +471,7 @@ const ItensNoMundo = {
   pegar(item) {
     const resultado = Inventario.adicionar(item.tipo, item.quantidade);
     if (resultado === "repetido") return Hud.anunciar(`Você já tem ${ITENS[item.tipo].nome}`);
-    if (!resultado) return Hud.anunciar("Inventário cheio!");
+    if (!resultado) return Hud.anunciar("Inventário cheio! Solte algum item com Q (no celular: botão ⤓ soltar)");
     item.ativo = false;
     item.grupo.visible = false;
     item.timer = 180; // 3 minutos para reaparecer (se for do tipo que renasce)

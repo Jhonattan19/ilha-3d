@@ -382,8 +382,11 @@ class Carro {
     if (e.estrada === 0) this.indiceEstrada = e.indice; // usado para o resgate (sempre no anel)
     this.distanciaEstrada = e.distancia;
     const h = Terreno.alturaTerreno(p.x, p.z);
-    if (h < Terreno.nivelAgua(p.x, p.z) - 0.6) this.superficie = "agua";   // (rio rasinho dá para atravessar devagar)
-    else if (e.distancia < CONFIG.estrada.largura / 2 + 0.5 || Terreno.altura(p.x, p.z) > h + 0.05 || Terreno.naPista(p.x, p.z)) this.superficie = "estrada";
+    // Em cima de uma ponte é estrada (antes o jogo olhava o fundo do rio embaixo dela e achava que
+    // você estava DENTRO d'água: a bicicleta quase parava e não conseguia subir a ponte)
+    const ponte = AguaDoce.alturaPonte(p.x, p.z), naPonte = ponte !== null && p.y > ponte - 1.3;
+    if (!naPonte && h < Terreno.nivelAgua(p.x, p.z) - 0.6) this.superficie = "agua";   // (rio rasinho dá para atravessar devagar)
+    else if (naPonte || e.distancia < CONFIG.estrada.largura / 2 + 0.5 || Terreno.altura(p.x, p.z) > h + 0.05 || Terreno.naPista(p.x, p.z)) this.superficie = "estrada";
     else if (h < 2) this.superficie = "areia";
     else this.superficie = "grama";
   }

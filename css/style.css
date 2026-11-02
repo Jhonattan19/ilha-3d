@@ -326,6 +326,10 @@ body.celular #tela { touch-action: none; }
 #btE { grid-column: 2; grid-row: 1; background: rgba(245, 158, 11, 0.35); }
 #btEspaco { grid-column: 1; grid-row: 2; }
 .usar-toque { grid-column: 2; grid-row: 2; }
+/* Soltar item: bolinha pequena encostada à esquerda do botão de pular (some dirigindo) */
+#btSoltar { position: absolute; left: -54px; bottom: 6px; width: 46px; height: 46px; }
+#btSoltar small { font-size: 7px; margin-top: 1px; }
+body.dirigindo #btSoltar { display: none; }
 .atalhos-toque { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; }
 body.celular:not(.vida-toque) .so-vida-toque { display: none; }
 
