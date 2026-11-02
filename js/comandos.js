@@ -6,6 +6,7 @@
 //   /tempo 14  ou  /tempo 14:30       → hora exata
 //   /tempo parar | continuar          → congela o ciclo do dia
 //   /clima sol | chuva | neve
+//   /violencia ligar | desligar        → modo em que os moradores podem morrer (vem desligado)
 //   /estacao primavera | verao | outono | inverno | halloween | natal | auto | ciclo
 //   /dar <item> [quantidade]           → ex.: /dar facão, /dar pedras 10
 //   /policia 0 a 5                     → estrelas de procurado (0 = a polícia esquece)
@@ -112,6 +113,12 @@ const Comandos = {
         Gasolina.definir(Jogo.carro.tipo, n);
         return this.mensagem(`⛽ Tanque com ${n}%`);
       }
+      case "violencia": case "violence": case "gta": {
+        const v = args[0];
+        const ligar = ["ligar", "ligada", "ligado", "on", "sim", "1"].includes(v) ? true : ["desligar", "desligada", "desligado", "off", "nao", "0"].includes(v) ? false : !Violencia.ligada;
+        Violencia.definir(ligar);
+        return this.mensagem(ligar ? "💀 Violência ligada: os moradores podem morrer (e a polícia vem com tudo)" : "🕊️ Violência desligada: ninguém morre na ilha");
+      }
       case "estacao": case "season": case "estacoes":
         return this.comandoEstacao(args[0]);
       case "primavera": case "verao": case "outono": case "inverno": case "halloween": case "natal":
@@ -181,6 +188,7 @@ const Comandos = {
       "/tempo manhã | tarde | noite | 14:30 | parar | continuar",
       "/clima sol | chuva | neve",
       "/estacao primavera | verao | outono | inverno | halloween | natal | auto | ciclo",
+      "/violencia ligar | desligar   (moradores podem morrer; vem desligado)",
       "/dar <item> [quantidade]   (ex.: /dar pedras 10)",
       "/graficos bonito | leve",
       "/policia 0 a 5   (estrelas de procurado)",

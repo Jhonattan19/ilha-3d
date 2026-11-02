@@ -32,6 +32,7 @@ const Jogo = {
     this.cena = new THREE.Scene();
     this.camera = CameraJogo.iniciar(window.innerWidth / window.innerHeight);
     Estacoes.iniciar();
+    Violencia.iniciar();
     Ceu.iniciar(this.cena, this.qualidadeAlta);
     Particulas.iniciar(this.cena);
     Clima.iniciar(this.cena);

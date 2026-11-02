@@ -63,7 +63,6 @@ const Toque = {
         <button data-tecla="KeyQ" class="bt pequeno" id="btSoltar"><b>⤓</b><small>soltar</small></button>
       </div>
       <div class="pedais-toque">
-        <button data-tecla="KeyW" class="bt pedal"><b>▲</b><small>acelera</small></button>
         <button data-tecla="KeyS" class="bt pedal"><b>▼</b><small>freia / ré</small></button>
       </div>
       <div class="atalhos-toque">
@@ -129,9 +128,12 @@ const Toque = {
       bolinha.style.transform = `translate(${dx}px, ${dy}px)`;
       const nx = dx / raio, ny = dy / raio;
       // Um pouquinho de "zona morta" no meio para não andar sem querer
-      // Dirigindo, o analógico só vira (acelerar e frear ficam nos pedais)
-      const dirigindo = document.body.classList.contains("dirigindo");
-      const teclas = { KeyW: !dirigindo && ny < -0.3, KeyS: !dirigindo && ny > 0.45, KeyA: nx < -0.35, KeyD: nx > 0.35 };
+      // Dirigindo: encostar o dedo no analógico já ACELERA, e para os lados vira
+      // (o polegar direito fica livre para o freio e o nitro). Puxar bem para baixo solta o acelerador.
+      // No avião o motor fica onde você deixou, então lá acelera empurrando para cima.
+      const dirigindo = document.body.classList.contains("dirigindo"), pilotando = document.body.classList.contains("pilotando");
+      const acelera = pilotando ? ny < -0.4 : dirigindo ? ny < 0.6 : ny < -0.3;
+      const teclas = { KeyW: acelera, KeyS: !dirigindo && ny > 0.45, KeyA: nx < -0.35, KeyD: nx > 0.35 };
       for (const [tecla, ligada] of Object.entries(teclas)) this.segurar("analogico", tecla, ligada);
     };
     const soltar = e => {
@@ -208,6 +210,7 @@ const Toque = {
     const posto = !jogo.aPe && !jogo.noBarco && !jogo.noAviao && Gasolina.temTanque(jogo.carro) && Atracoes.noPosto(jogo.carro);
     this.trocarTexto("rotuloE", posto ? "posto" : jogo.noAviao || jogo.noBarco || !jogo.aPe ? "sair" : "ação");
     document.body.classList.toggle("dirigindo", !jogo.aPe);
+    document.body.classList.toggle("pilotando", !!jogo.noAviao);
     document.body.classList.toggle("vida-toque", Vida.ativo);
   },
 

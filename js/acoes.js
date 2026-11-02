@@ -260,7 +260,7 @@ const Acoes = {
       const dx = o.posicao.x - p.x, dz = o.posicao.z - p.z, d = Math.hypot(dx, dz);
       return d < alcance + 0.4 && (dx * fx + dz * fz) / (d || 1) > 0.3;
     };
-    return Animais.lista.some(naFrente) || Moradores.lista.some(m => m.estado !== "emCasa" && m.estado !== "caido" && naFrente(m));
+    return Animais.lista.some(naFrente) || Moradores.lista.some(m => !m.ausente && naFrente(m));
   },
 
   atirarPedra(pessoa) {
@@ -330,7 +330,7 @@ const Acoes = {
       if (d > menor || d < 0.8) return;
       if (Math.abs(Util.diferencaAngulo(Math.atan2(dx, dz), pessoa.direcao)) < abertura) { menor = d; melhor = o; }
     };
-    for (const m of Moradores.lista) if (m.estado !== "emCasa" && m.estado !== "caido") ver(m);
+    for (const m of Moradores.lista) if (!m.ausente) ver(m);
     for (const a of Animais.lista) ver(a);
     return melhor;
   },
@@ -338,17 +338,18 @@ const Acoes = {
   // Morador encostando no ponto (para os tiros)
   moradorEm(pos, raio) {
     for (const m of Moradores.lista) {
-      if (m.estado === "emCasa" || m.estado === "caido" || !m.modelo.visible) continue;
+      if (m.ausente || !m.modelo.visible) continue;
       if (Math.hypot(m.posicao.x - pos.x, m.posicao.z - pos.z) < raio + m.raio && pos.y > m.posicao.y - 0.1 && pos.y < m.posicao.y + 1.9) return m;
     }
     return null;
   },
 
   reagir(m, de, tipo, derruba, estrelas) {
+    if (estrelas) Policia.crime(estrelas, Jogo.posicaoJogador(), tipo === "tinta" ? "vandalismo" : "agressão");
+    if (m.machucar(DANO[tipo] || 0, de.x, de.z)) return;          // modo Violência: esse foi fatal
     const lista = FRASES_ARMA[tipo], frase = lista[Math.floor(Math.random() * lista.length)];
     if (derruba) m.cair(de.x, de.z, frase);
     else { m.fugir(de, 4); Hud.anunciar(`🗣️ ${m.nome}: ${frase}`); }
-    if (estrelas) Policia.crime(estrelas, Jogo.posicaoJogador(), tipo === "tinta" ? "vandalismo" : "agressão");
   },
 
   novoProjetil(dados) {
@@ -436,8 +437,10 @@ const Acoes = {
     if (!alvo) return;
     if (alvo instanceof Morador) {
       this.reagir(alvo, p, "choque", true, 2);
-      alvo.timer = 6;                         // fica mais tempo no chão, tonto
-      this.tontos.push({ m: alvo, t: 6 });
+      if (alvo.estado === "caido") {
+        alvo.timer = 6;                       // fica mais tempo no chão, tonto
+        this.tontos.push({ m: alvo, t: 6 });
+      }
     } else {
       alvo.atingido(f.x, f.z, 6);
     }

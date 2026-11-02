@@ -185,7 +185,7 @@ const Policia = {
       }
       // Testemunhas: moradores pertinho também avisam a polícia
       if (!visto && !this.esconderijo && !jogo.noAviao) {
-        visto = Moradores.lista.some(m => m.estado !== "emCasa" && m.estado !== "caido" && Math.hypot(m.posicao.x - pos.x, m.posicao.z - pos.z) < 22);
+        visto = Moradores.lista.some(m => !m.ausente && Math.hypot(m.posicao.x - pos.x, m.posicao.z - pos.z) < 22);
       }
       this.visto = visto;
       if (visto) { this.perdido = 0; this.ultimaVista = { x: pos.x, z: pos.z }; }

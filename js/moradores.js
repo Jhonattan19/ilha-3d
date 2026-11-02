@@ -76,6 +76,60 @@ class Morador {
     this.trabalhoVida = null;               // na Nova Vida pode ser num quiosque
     this.lazer = null;
     this.aposentado = sorteio() < 0.2;
+    this.vidaMorador = 100;                 // só cai no modo Violência
+  }
+
+  // Fora de alcance: em casa, caído, morto ou ainda não chegou (depois de morrer)
+  get ausente() {
+    return this.estado === "emCasa" || this.estado === "caido" || this.estado === "morto" || this.estado === "sumido";
+  }
+
+  // ---------- Modo Violência ----------
+
+  // Tira vida (só com a Violência ligada). Devolve true se ele morreu.
+  machucar(dano, deX, deZ) {
+    if (!Violencia.ligada || this.estado === "morto" || this.estado === "sumido" || dano <= 0) return false;
+    this.vidaMorador -= dano;
+    if (this.vidaMorador > 0) return false;
+    this.morrer(deX, deZ);
+    return true;
+  }
+
+  morrer(deX, deZ) {
+    this.estado = "morto";
+    this.timer = TEMPO_CORPO;
+    this.velocidade = 0;
+    const d = Math.hypot(this.posicao.x - deX, this.posicao.z - deZ) || 1;
+    this.empurrao = { x: (this.posicao.x - deX) / d * 4, z: (this.posicao.z - deZ) / d * 4 };
+    if (this.corpo.palpebras) this.corpo.palpebras.visible = true;     // olhos fechados
+    Som.dor();
+    Hud.anunciar(`💀 ${this.nome} morreu`);
+    Policia.crime(6, Jogo.posicaoJogador(), "homicídio");
+  }
+
+  // Chega alguém novo no lugar (ou volta a mesma pessoa, se ela tem missão)
+  renascer() {
+    if (!this.npcNome) {
+      const usados = new Set(Moradores.lista.map(m => m.nome));
+      const livres = NOMES_MORADORES.filter(n => !usados.has(n));
+      this.nome = livres.length ? livres[Math.floor(Math.random() * livres.length)] : `${this.nome.split(" ")[0]} Filho`;
+      // Corpo novo (outra roupa, cabelo, cor de pele...)
+      const velho = this.corpo;
+      Moradores.grupo.remove(this.modelo);
+      this.modelo.traverse(o => { if (o.isMesh && o.geometry) o.geometry.dispose(); });
+      Corpo.todos = Corpo.todos.filter(c => c !== velho);
+      const m = Moradores.criarModelo(Math.random);
+      this.corpo = m; this.modelo = m.grupo; this.pernas = m.pernas; this.bracos = m.bracos;
+      Moradores.grupo.add(this.modelo);
+      this.aposentado = Math.random() < 0.2;
+    }
+    if (this.corpo.palpebras) this.corpo.palpebras.visible = false;
+    const lugar = this.casa || this.trabalho || Moradores.pontoDePasseio(Terreno.praca);
+    if (lugar) this.posicao.set(lugar.x, Casas.alturaChao(lugar.x, lugar.z), lugar.z);
+    this.vidaMorador = 100;
+    this.estado = "parado";
+    this.timer = 2;
+    this.modelo.visible = true;
   }
 
   // Os quiosques só existem na Nova Vida: no modo livre ele trabalha em outro lugar
@@ -161,6 +215,8 @@ class Morador {
   // Longe de você ninguém vê: anda reto e rápido até o destino (para a rotina dar tempo)
   atualizarLonge(dt) {
     this.timer -= dt;
+    if (this.estado === "morto") { if (this.timer <= 0) { this.estado = "sumido"; this.timer = TEMPO_RENASCER; this.modelo.visible = false; } return; }
+    if (this.estado === "sumido") { if (this.timer <= 0) this.renascer(); return; }
     if (this.estado === "emCasa") { if (this.agenda() !== "casa") { this.estado = "parado"; this.timer = 0; } return; }
     if (this.estado === "caido" || this.estado === "fugindo" || this.estado === "conversando") { this.estado = "parado"; this.timer = 0; }
     if (this.estado === "parado") { if (this.timer <= 0) this.proximoDestino(); return; }
@@ -183,12 +239,13 @@ class Morador {
     this.timer -= dt;
 
     // Carro vindo rápido na direção dele: sai da frente (ou é atropelado)
-    if (!jogo.aPe && !jogo.noBarco && !jogo.noAviao && jogo.temVeiculo && this.estado !== "caido" && this.estado !== "emCasa") {
+    if (!jogo.aPe && !jogo.noBarco && !jogo.noAviao && jogo.temVeiculo && !this.ausente) {
       const c = jogo.carro, dx = p.x - c.posicao.x, dz = p.z - c.posicao.z, d = Math.hypot(dx, dz);
       if (c.velocidade > 5 && d < c.def.raio + 0.6) {
         c.vx *= 0.75; c.vz *= 0.75;
-        this.cair(c.posicao.x, c.posicao.z, FRASES.atropelado[Math.floor(Math.random() * FRASES.atropelado.length)]);
         Policia.crime(c.velocidade > 14 ? 3 : 2, c.posicao, "atropelamento");
+        if (!this.machucar(DANO.atropelamento(c.velocidade), c.posicao.x, c.posicao.z))
+          this.cair(c.posicao.x, c.posicao.z, FRASES.atropelado[Math.floor(Math.random() * FRASES.atropelado.length)]);
       } else if (c.velocidade > 4 && d < 14 && (dx * c.vx + dz * c.vz) / (d * c.velocidade) > 0.7) {
         if (this.estado !== "fugindo") this.fugir({ x: c.posicao.x + c.vz, z: c.posicao.z - c.vx }, 1.5);   // pula para o lado
       }
@@ -248,6 +305,15 @@ class Morador {
         this.virarPara(Math.atan2(this.olharPara.x - p.x, this.olharPara.z - p.z), dt, 6);
         if (this.timer <= 0) { this.estado = "parado"; this.timer = 1 + Math.random() * 3; }
         break;
+      case "morto":
+        p.x += this.empurrao.x * dt; p.z += this.empurrao.z * dt;
+        this.empurrao.x *= Math.exp(-5 * dt); this.empurrao.z *= Math.exp(-5 * dt);
+        if (this.timer <= 0) { this.estado = "sumido"; this.timer = TEMPO_RENASCER; this.modelo.visible = false; }
+        break;
+      case "sumido":
+        this.modelo.visible = false;
+        if (this.timer <= 0) this.renascer();
+        return;
       case "caido":
         p.x += this.empurrao.x * dt; p.z += this.empurrao.z * dt;
         this.empurrao.x *= Math.exp(-5 * dt); this.empurrao.z *= Math.exp(-5 * dt);
@@ -307,6 +373,15 @@ class Morador {
     if (this.estado === "conversando") this.bracos[1].rotation.x = -0.6 + Math.sin(this.fase * 3 + performance.now() / 200) * 0.3;  // gesticula
     if (this.estado === "fugindo") { this.bracos[0].rotation.x = this.bracos[1].rotation.x = -2.6; }                                  // braços para cima!
     Corpo.articular(this.corpo);
+    if (this.estado === "morto") {           // deitado, parado, olhos fechados
+      this.pernas[0].rotation.x = this.pernas[1].rotation.x = 0;
+      this.bracos[0].rotation.x = -0.3; this.bracos[1].rotation.x = -2.8;
+      Corpo.articular(this.corpo);
+      this.modelo.position.copy(this.posicao);
+      this.modelo.position.y += 0.18;
+      this.modelo.rotation.set(-1.52, this.direcao, 0);
+      return;
+    }
     // Pisca, respira e olha para você quando você chega perto (se não estiver fugindo ou caído)
     const eu = Moradores.olhar, p = this.posicao;
     const pertinho = eu && Math.hypot(eu.x - p.x, eu.z - p.z) < 8 && this.estado !== "fugindo" && this.estado !== "caido";
@@ -433,7 +508,7 @@ const Moradores = {
   maisProximo(posicao, alcance = 2.4) {
     let melhor = null, menor = alcance;
     for (const m of this.lista) {
-      if (m.estado === "emCasa" || m.estado === "caido") continue;
+      if (m.ausente) continue;
       const d = Math.hypot(m.posicao.x - posicao.x, m.posicao.z - posicao.z);
       if (d < menor) { menor = d; melhor = m; }
     }
@@ -445,11 +520,14 @@ const Moradores = {
     const fx = Math.sin(direcao), fz = Math.cos(direcao);
     let acertos = 0;
     for (const m of this.lista) {
-      if (m.estado === "emCasa" || m.estado === "caido") continue;
+      // (com a Violência ligada dá para bater em quem já está no chão)
+      if (m.estado === "emCasa" || m.estado === "morto" || m.estado === "sumido" || (m.estado === "caido" && !Violencia.ligada)) continue;
       const dx = m.posicao.x - posicao.x, dz = m.posicao.z - posicao.z, d = Math.hypot(dx, dz);
       if (d < alcance + m.raio && (dx * fx + dz * fz) / (d || 1) > 0.3) {
         const frase = FRASES.apanhou[Math.floor(Math.random() * FRASES.apanhou.length)];
-        if (forca >= 6) m.cair(posicao.x, posicao.z, frase);     // golpe forte derruba
+        if (m.machucar(DANO.golpe(forca), posicao.x, posicao.z)) { acertos++; continue; }
+        if (m.estado === "caido") { m.timer = Math.max(m.timer, 1.5); Som.dor(); }
+        else if (forca >= 6) m.cair(posicao.x, posicao.z, frase);     // golpe forte derruba
         else { m.fugir(posicao, 4); Hud.anunciar(`🗣️ ${m.nome}: ${frase}`); }
         acertos++;
       }
@@ -464,7 +542,7 @@ const Moradores = {
     const noite = Ceu.hora > 20.5 || Ceu.hora < 6;
     for (const m of this.lista) {
       const perto = Math.abs(m.posicao.x - eu.x) < 150 && Math.abs(m.posicao.z - eu.z) < 150;
-      if (m.estado !== "emCasa") m.modelo.visible = perto;
+      if (m.estado !== "emCasa" && m.estado !== "sumido") m.modelo.visible = perto;
       if (perto) m.atualizar(dt, jogo, noite);
       else m.atualizarLonge(dt);
     }

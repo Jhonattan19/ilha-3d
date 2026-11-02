@@ -224,6 +224,7 @@ button {
 button:hover { transform: translateY(-2px); background: #fbbf24; }
 button.secundario { background: rgba(255, 255, 255, 0.14); color: #f1f5f9; }
 button.secundario:hover { background: rgba(255, 255, 255, 0.24); }
+button.secundario.perigo { background: rgba(185, 28, 28, 0.55); border-color: #f87171; }
 
 @media (max-width: 800px) {
   .titulo { font-size: 42px; }
@@ -330,6 +331,8 @@ body.celular #tela { touch-action: none; }
 #btSoltar { position: absolute; left: -54px; bottom: 6px; width: 46px; height: 46px; }
 #btSoltar small { font-size: 7px; margin-top: 1px; }
 body.dirigindo #btSoltar { display: none; }
+/* Dirigindo só fica um freio (o FREIA / RÉ); o botão de pular volta no avião, onde ele é "subir" */
+body.dirigindo:not(.pilotando) #btEspaco { visibility: hidden; }
 .atalhos-toque { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; }
 body.celular:not(.vida-toque) .so-vida-toque { display: none; }
 
@@ -387,9 +390,15 @@ body.celular .linha-log { font-size: 11px; }
 /* Pedais (aparecem dirigindo, pilotando ou no barco) */
 .pedais-toque { position: absolute; right: calc(180px + env(safe-area-inset-right)); bottom: 14px; display: none; flex-direction: column; gap: 10px; }
 body.dirigindo .pedais-toque { display: flex; }
-.bt.pedal { width: 64px; height: 76px; border-radius: 14px; }
-.bt.pedal:first-child { background: rgba(34, 197, 94, 0.35); border-color: rgba(134, 239, 172, 0.7); }
-.bt.pedal:last-child { background: rgba(239, 68, 68, 0.3); border-color: rgba(252, 165, 165, 0.6); height: 62px; }
+.bt.pedal { width: 70px; height: 76px; border-radius: 14px; background: rgba(239, 68, 68, 0.3); border-color: rgba(252, 165, 165, 0.6); }
+/* Dirigindo, o analógico é o acelerador: fica verde e mostra a dica em cima */
+body.dirigindo .joystick { border-color: rgba(134, 239, 172, 0.75); }
+body.dirigindo .joystick.ativo { background: rgba(34, 197, 94, 0.22); }
+body.dirigindo .joystick::after {
+  content: "encoste = acelera"; position: absolute; left: 50%; top: -17px; transform: translateX(-50%); white-space: nowrap;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: rgba(255, 255, 255, 0.8); text-shadow: 0 1px 2px #000;
+}
+body.pilotando .joystick::after { content: "para cima = motor"; }
 .bt.pedal.apertado { background: rgba(245, 158, 11, 0.65); }
 /* No celular o console aparece quando aberto pelo botão 🌤️ */
 body.celular .console:not(.escondido) { display: block; bottom: auto; top: 60px; z-index: 30; }
